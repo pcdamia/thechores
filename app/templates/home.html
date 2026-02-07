@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Chores - Home</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="login-page">
+    <div class="dashboard">
+    <!-- Date/Time and Weather - Combined Card -->
+    <div class="dashboard-header">
+        <div class="glass-card header-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 24px;">
+                <div class="date-time">
+                    <div id="current-date" class="date-display"></div>
+                    <div id="current-time" class="time-display"></div>
+                </div>
+                <div class="weather">
+                    <div id="weather-icon">☀️</div>
+                    <div id="weather-info">
+                        <div id="weather-temp">--°F</div>
+                        <div id="weather-desc">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+        
+        <!-- Greeting: double-click "The Chores" to open sign-in (hidden login) -->
+        <div class="greeting-section">
+            <h2 id="greeting" class="greeting-text">Welcome to <span id="the-chores-title" class="the-chores-title" title="">The Chores</span>!</h2>
+        </div>
+        
+        <!-- Calendar - Full Width -->
+        <div class="calendar-section">
+            <div class="glass-card calendar-card" style="width: 100%; padding: 24px;">
+                <h3 style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--glass-border);">Calendar</h3>
+                <div id="calendar" class="calendar-grid">
+                    <!-- Calendar will be generated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Event details modal (read-only for guests); Edit shows login prompt -->
+    <div id="event-detail-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content glass-card">
+            <h3 id="event-detail-title" style="margin: 0 0 12px 0;">Event</h3>
+            <p id="event-detail-date" style="margin: 8px 0; color: var(--text-secondary);"></p>
+            <p id="event-detail-type" style="margin: 8px 0; color: var(--text-secondary);"></p>
+            <p id="event-detail-desc" style="margin: 8px 0; color: var(--text-primary);"></p>
+            <div style="margin-top: 20px; display: flex; gap: 12px; justify-content: flex-end;">
+                <button type="button" onclick="closeEventDetailModal()" style="padding: 10px 20px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.1); color: var(--text-primary); cursor: pointer;">Close</button>
+                <button type="button" id="event-detail-edit-btn" onclick="editEventRequiresLogin()" style="padding: 10px 20px; border-radius: 8px; border: none; background: rgba(59, 130, 246, 0.8); color: white; cursor: pointer; font-weight: 600;">Edit</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Login prompt modal (when guest clicks Edit on event) -->
+    <div id="login-prompt-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content glass-card">
+            <h3>Log in to edit</h3>
+            <p style="margin: 12px 0; color: var(--text-secondary);">Sign in to edit events and use all features.</p>
+            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
+                <button type="button" onclick="closeLoginPromptModal()" style="padding: 10px 20px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.1); color: var(--text-primary); cursor: pointer;">Cancel</button>
+                <a href="/auth/login" style="padding: 10px 20px; border-radius: 8px; border: none; background: rgba(59, 130, 246, 0.8); color: white; cursor: pointer; font-weight: 600; text-decoration: none;">Log in</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sign-in modal (hidden trigger: double-click "The Chores" or press P three times) -->
+    <div id="signin-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content glass-card signin-modal-content" style="max-width: 400px;">
+            <h3 style="margin: 0 0 16px 0;">Sign in</h3>
+            <form id="signin-form">
+                <div style="margin-bottom: 16px;">
+                    <label for="signin-username" style="display: block; margin-bottom: 8px;">Username</label>
+                    <input type="text" id="signin-username" name="username" required class="form-input">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label for="signin-password" style="display: block; margin-bottom: 8px;">Password</label>
+                    <input type="password" id="signin-password" name="password" required class="form-input">
+                </div>
+                <div id="signin-error" style="color: #dc2626; margin-bottom: 12px; display: none;"></div>
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button type="button" onclick="closeSigninModal()" class="signin-btn-cancel">Cancel</button>
+                    <button type="submit" class="signin-btn-submit">Sign in</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+<style>
+/* Unauthenticated dashboard: gradient that promotes trust, comfort, excitement — subtle but attention-grabbing */
+body.login-page {
+    background: linear-gradient(160deg, #e8f4fc 0%, #d4e8f7 18%, #ebe4f8 40%, #f5eef8 60%, #fef5e7 82%, #fce8d5 100%) !important;
+    background-attachment: fixed !important;
+}
+
+body.login-page .dashboard {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+/* Cards stand out from gradient: semi-opaque light surface */
+body.login-page .glass-card {
+    background: rgba(255, 255, 255, 0.75) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.5) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+body.login-page .glass-card:hover {
+    background: rgba(255, 255, 255, 0.85) !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+}
+
+body.login-page .date-display,
+body.login-page .time-display,
+body.login-page .greeting-text,
+body.login-page .calendar-day-number {
+    color: #2d3748 !important;
+}
+
+body.login-page #weather-temp,
+body.login-page #weather-desc,
+body.login-page .calendar-day-header {
+    color: #4a5568 !important;
+}
+
+body.login-page .calendar-day {
+    background: rgba(255, 255, 255, 0.5);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+body.login-page .calendar-day.today {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: rgba(99, 102, 241, 0.4);
+}
+
+body.login-page .calendar-event {
+    color: #2d3748 !important;
+}
+
+/* "The Chores" is double-clickable for hidden sign-in; no visible cue */
+body.login-page .the-chores-title {
+    cursor: default;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* Sign-in modal: dark text on light background for readability */
+#signin-modal .signin-modal-content {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    color: #1f2937 !important;
+}
+#signin-modal .signin-modal-content h3,
+#signin-modal .signin-modal-content label {
+    color: #1f2937 !important;
+}
+#signin-modal .form-input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    color: #1f2937;
+    box-sizing: border-box;
+}
+#signin-modal .form-input::placeholder {
+    color: #9ca3af;
+}
+#signin-modal .signin-btn-cancel {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: #f3f4f6;
+    color: #374151;
+    cursor: pointer;
+    font-size: 14px;
+}
+#signin-modal .signin-btn-submit {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    background: #2563eb;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.dashboard-header {
+    margin-bottom: 24px;
+}
+
+.header-card {
+    padding: 24px;
+}
+
+.date-time {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.date-display {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.time-display {
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.weather {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+#weather-icon {
+    font-size: 56px;
+}
+
+#weather-info {
+    text-align: left;
+}
+
+#weather-temp {
+    font-size: 28px;
+    font-weight: 700;
+}
+
+#weather-desc {
+    font-size: 16px;
+    color: var(--text-secondary);
+}
+
+
+.greeting-section {
+    margin-bottom: 24px;
+}
+
+.greeting-text {
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.quick-actions {
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.quick-action-card {
+    text-align: center;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.quick-action-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+}
+
+.action-icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+}
+
+.quick-action-card h3 {
+    margin: 0 0 4px 0;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.quick-action-card p {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.magnets-section {
+    margin-bottom: 24px;
+}
+
+.magnets-card {
+    padding: 20px;
+}
+
+.magnets-container {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.event-magnet {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 2px solid var(--glass-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    cursor: grab;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow);
+}
+
+.event-magnet:hover {
+    transform: scale(1.1);
+    box-shadow: var(--shadow-hover);
+}
+
+.event-magnet.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+}
+
+.calendar-section {
+    margin-bottom: 24px;
+    width: 100%;
+}
+
+.calendar-card {
+    padding: 24px;
+    width: 100%;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 12px;
+    width: 100%;
+}
+
+.calendar-day-header {
+    text-align: center;
+    padding: 16px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 16px;
+}
+
+.calendar-day {
+    min-height: 120px;
+    padding: 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.calendar-day.drag-over {
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px dashed var(--glass-border);
+}
+
+.calendar-day:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.05);
+}
+
+.calendar-day.today {
+    background: rgba(255, 255, 255, 0.15);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.calendar-day-number {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.calendar-day-events {
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.calendar-event {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 6px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.calendar-event.shopping {
+    background: rgba(251, 191, 36, 0.4);
+}
+
+.calendar-event.appointment {
+    background: rgba(168, 85, 247, 0.4);
+}
+
+.calendar-event.birthday {
+    background: rgba(236, 72, 153, 0.4);
+}
+
+.calendar-event.meeting {
+    background: rgba(34, 197, 94, 0.4);
+}
+
+.calendar-event.reminder {
+    background: rgba(249, 115, 22, 0.4);
+}
+
+.calendar-event.travel {
+    background: rgba(14, 165, 233, 0.4);
+}
+
+.calendar-event.recurring-trash {
+    background: rgba(34, 197, 94, 0.5);
+    font-weight: 600;
+}
+
+.calendar-event.recurring-trash.recycling {
+    background: rgba(59, 130, 246, 0.5);
+}
+
+.calendar-event.recurring-parking {
+    background: rgba(251, 191, 36, 0.5);
+    font-weight: 600;
+}
+
+.parking-arrow {
+    color: #ef4444;
+    font-size: 20px;
+    font-weight: bold;
+    margin-left: 4px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    min-width: 400px;
+    max-width: 500px;
+    padding: 24px;
+    border-radius: 16px;
+}
+
+.modal-content h3 {
+    margin: 0 0 16px 0;
+    color: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+    .modal-content {
+        min-width: 90%;
+        margin: 20px;
+    }
+}
+</style>
+
+<script>
+    const today = new Date();
+    let currentMonth = today.getMonth();
+    let currentYear = today.getFullYear();
+    
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    
+    // Update date and time
+    function updateDateTime() {
+        const now = new Date();
+        const dateStr = `${dayNames[now.getDay()]}, ${monthNames[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        
+        document.getElementById('current-date').textContent = dateStr;
+        document.getElementById('current-time').textContent = timeStr;
+    }
+    
+    // Load weather from Open-Meteo (free, no API key)
+    function weatherCodeToDesc(code) {
+        const wmo = { 0: 'Clear', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast', 45: 'Foggy', 48: 'Foggy', 51: 'Light drizzle', 53: 'Drizzle', 55: 'Dense drizzle', 61: 'Slight rain', 63: 'Rain', 65: 'Heavy rain', 71: 'Slight snow', 73: 'Snow', 75: 'Heavy snow', 77: 'Snow grains', 80: 'Slight rain showers', 81: 'Rain showers', 82: 'Heavy rain showers', 85: 'Snow showers', 86: 'Heavy snow showers', 95: 'Thunderstorm', 96: 'Thunderstorm with hail', 99: 'Thunderstorm with heavy hail' };
+        return wmo[code] || 'Unknown';
+    }
+    function weatherCodeToIcon(code) {
+        if (code === 0) return '☀️'; if (code <= 3) return '⛅'; if (code <= 48) return '🌫️';
+        if (code <= 67) return '🌧️'; if (code <= 77) return '❄️'; if (code <= 82) return '🌦️';
+        if (code <= 86) return '🌨️'; if (code <= 99) return '⛈️'; return '🌡️';
+    }
+    function loadWeather() {
+        const setWeather = (temp, desc, icon) => {
+            const te = document.getElementById('weather-temp'); if (te) te.textContent = temp;
+            const de = document.getElementById('weather-desc'); if (de) de.textContent = desc;
+            const ic = document.getElementById('weather-icon'); if (ic) ic.textContent = icon;
+        };
+        const fetchWeather = (lat, lon) => {
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`;
+            fetch(url).then(r => r.json()).then(data => {
+                const c = data.current;
+                if (c) {
+                    const temp = Math.round(c.temperature_2m) + '°F';
+                    const desc = weatherCodeToDesc(c.weather_code);
+                    const icon = weatherCodeToIcon(c.weather_code);
+                    setWeather(temp, desc, icon);
+                } else setWeather('--°F', 'Unavailable', '🌡️');
+            }).catch(() => setWeather('--°F', 'Unavailable', '🌡️'));
+        };
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                pos => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+                () => fetchWeather(40.7128, -74.0060),
+                { timeout: 5000, maximumAge: 600000 }
+            );
+        } else fetchWeather(40.7128, -74.0060);
+    }
+    
+    // Load calendar data
+    let events = [];
+    
+    function loadCalendarData() {
+        // Load events for current month (public - no auth required)
+        const startDate = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+        const endDate = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
+        fetch(`/events/api?start_date=${startDate}&end_date=${endDate}`)
+            .then(r => r.json())
+            .then(data => {
+                events = data;
+                renderCalendar();
+            })
+            .catch(() => {
+                // If API fails (auth required), just render empty calendar
+                renderCalendar();
+            });
+    }
+    
+    function getRecurringEvents(dateStr) {
+        // Parse date string properly to avoid UTC timezone issues
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const date = new Date(year, month - 1, day); // month is 0-indexed
+        const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        const recurring = [];
+        
+        // Trash days
+        if (dayOfWeek === 1) { // Monday - Recycling
+            recurring.push({ type: 'trash', label: '♻️ Recycling', class: 'recurring-trash recycling' });
+        }
+        if (dayOfWeek === 4) { // Thursday - Regular trash
+            recurring.push({ type: 'trash', label: '🗑️ Trash', class: 'recurring-trash regular' });
+        }
+        
+        // Alternate side parking
+        const now = new Date();
+        const isToday = dateStr === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const isParkingTime = isToday && currentHour >= 9 && (currentHour < 10 || (currentHour === 10 && currentMinute <= 30));
+        
+        if (dayOfWeek === 2 || dayOfWeek === 4) { // Tuesday & Thursday
+            recurring.push({ 
+                type: 'parking', 
+                label: '🚗 Parking (T/Th)', 
+                class: 'recurring-parking tue-thu',
+                showArrow: isParkingTime
+            });
+        }
+        if (dayOfWeek === 1 || dayOfWeek === 5) { // Monday & Friday
+            recurring.push({ 
+                type: 'parking', 
+                label: '🚗 Parking (M/F)', 
+                class: 'recurring-parking mon-fri',
+                showArrow: isParkingTime
+            });
+        }
+        
+        return recurring;
+    }
+    
+    function renderCalendar() {
+        const calendar = document.getElementById('calendar');
+        calendar.innerHTML = '';
+        
+        // Add day headers
+        dayNames.forEach(day => {
+            const header = document.createElement('div');
+            header.className = 'calendar-day-header';
+            header.textContent = day;
+            calendar.appendChild(header);
+        });
+        
+        const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const todayDate = new Date();
+        const isCurrentMonth = currentMonth === todayDate.getMonth() && currentYear === todayDate.getFullYear();
+        
+        // Add empty cells for days before month starts
+        for (let i = 0; i < firstDay; i++) {
+            const empty = document.createElement('div');
+            empty.className = 'calendar-day';
+            empty.style.opacity = '0.3';
+            calendar.appendChild(empty);
+        }
+        
+        // Add days of the month
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dayDiv = document.createElement('div');
+            const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const dayEvents = events.filter(e => e.date === dateStr);
+            const recurringEvents = getRecurringEvents(dateStr);
+            
+            const isToday = isCurrentMonth && day === todayDate.getDate();
+            
+            dayDiv.className = 'calendar-day' + (isToday ? ' today' : '');
+            dayDiv.dataset.date = dateStr;
+            
+            dayDiv.innerHTML = `
+                <div class="calendar-day-number">
+                    ${day}
+                    ${recurringEvents.filter(r => r.showArrow).map(r => `<span class="parking-arrow">→</span>`).join('')}
+                </div>
+                <div class="calendar-day-events">
+                    ${recurringEvents.map(r => `<div class="calendar-event ${r.class}">${r.label}</div>`).join('')}
+                    ${dayEvents.map(e => {
+                        const eventType = e.title.toLowerCase().includes('shopping') ? 'shopping' :
+                                         e.title.toLowerCase().includes('appointment') ? 'appointment' :
+                                         e.title.toLowerCase().includes('birthday') ? 'birthday' :
+                                         e.title.toLowerCase().includes('meeting') ? 'meeting' :
+                                         e.title.toLowerCase().includes('reminder') ? 'reminder' :
+                                         e.title.toLowerCase().includes('travel') ? 'travel' : (e.event_type || 'event');
+                        return `<div class="calendar-event ${eventType}" data-event-id="${e.id}" onclick="viewEventDetails(${e.id})" style="cursor: pointer;" title="Click to view details">${e.title}</div>`;
+                    }).join('')}
+                </div>
+            `;
+            
+            // Make calendar day a drop zone
+            dayDiv.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dayDiv.classList.add('drag-over');
+            });
+            
+            dayDiv.addEventListener('dragleave', () => {
+                dayDiv.classList.remove('drag-over');
+            });
+            
+            dayDiv.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dayDiv.classList.remove('drag-over');
+                
+                if (draggedMagnet) {
+                    const magnetType = draggedMagnet.dataset.magnetType;
+                    const date = dayDiv.dataset.date;
+                    
+                    if (magnetType === 'event') {
+                        const eventType = draggedMagnet.dataset.eventType;
+                        const eventTitle = draggedMagnet.dataset.eventTitle;
+                        createEvent(eventTitle, date, eventType);
+                    } else if (magnetType === 'chore') {
+                        const choreTask = draggedMagnet.dataset.choreTask;
+                        const choreIcon = draggedMagnet.dataset.choreIcon;
+                        createChore(choreTask, date, choreIcon);
+                    }
+                }
+            });
+            
+            calendar.appendChild(dayDiv);
+        }
+    }
+    
+    // Event magnet drag and drop
+    let draggedMagnet = null;
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        const magnets = document.querySelectorAll('.event-magnet');
+        
+        magnets.forEach(magnet => {
+            magnet.addEventListener('dragstart', (e) => {
+                e.stopPropagation();
+                draggedMagnet = magnet;
+                magnet.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            
+            magnet.addEventListener('dragend', () => {
+                magnet.classList.remove('dragging');
+                draggedMagnet = null;
+                document.querySelectorAll('.calendar-day').forEach(day => {
+                    day.classList.remove('drag-over');
+                });
+            });
+        });
+    });
+    
+    function createEvent(title, date, eventType = null) {
+        // Show password prompt modal for unauthenticated users
+        showPasswordPrompt(title, date, eventType);
+    }
+    
+    function createChore(task, date, icon) {
+        // Show password prompt for unauthenticated users
+        alert('Please log in to create chores');
+    }
+    
+    function showPasswordPrompt(title, date, eventType = null) {
+        const modal = document.getElementById('login-modal');
+        if (!modal) {
+            // Create modal if it doesn't exist
+            const modalHTML = `
+                <div id="login-modal" class="modal-overlay" style="display: none;">
+                    <div class="modal-content glass-card">
+                        <h3>Login to Create Event</h3>
+                        <p id="modal-event-info" style="margin: 12px 0; color: var(--text-secondary);"></p>
+                        <form id="login-form" onsubmit="handleQuickLogin(event)">
+                            <div style="margin-bottom: 16px;">
+                                <label for="modal-username" style="display: block; margin-bottom: 8px; color: var(--text-primary);">Username</label>
+                                <input type="text" id="modal-username" name="username" required 
+                                       style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--glass-border); 
+                                              background: rgba(255,255,255,0.1); color: var(--text-primary);">
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <label for="modal-password" style="display: block; margin-bottom: 8px; color: var(--text-primary);">Password</label>
+                                <input type="password" id="modal-password" name="password" required 
+                                       style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--glass-border); 
+                                              background: rgba(255,255,255,0.1); color: var(--text-primary);">
+                            </div>
+                            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                                <button type="button" onclick="closeLoginModal()" 
+                                        style="padding: 10px 20px; border-radius: 8px; border: 1px solid var(--glass-border); 
+                                               background: rgba(255,255,255,0.1); color: var(--text-primary); cursor: pointer;">
+                                    Cancel
+                                </button>
+                                <button type="submit" 
+                                        style="padding: 10px 20px; border-radius: 8px; border: none; 
+                                               background: rgba(59, 130, 246, 0.8); color: white; cursor: pointer; font-weight: 600;">
+                                    Login & Create
+                                </button>
+                            </div>
+                        </form>
+                        <div id="modal-error" style="margin-top: 12px; color: #ef4444; display: none;"></div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+        }
+        
+        document.getElementById('modal-event-info').textContent = `Create "${title}" on ${new Date(date).toLocaleDateString()}`;
+        document.getElementById('modal-username').value = '';
+        document.getElementById('modal-password').value = '';
+        document.getElementById('modal-error').style.display = 'none';
+        document.getElementById('login-modal').style.display = 'flex';
+        document.getElementById('modal-username').focus();
+        
+        // Store event data for after login
+        window.pendingEvent = { title, date, event_type: eventType };
+    }
+    
+    function closeLoginModal() {
+        document.getElementById('login-modal').style.display = 'none';
+        window.pendingEvent = null;
+    }
+    
+    function handleQuickLogin(event) {
+        event.preventDefault();
+        const username = document.getElementById('modal-username').value;
+        const password = document.getElementById('modal-password').value;
+        const errorDiv = document.getElementById('modal-error');
+        
+        // Try to login with JSON response
+        fetch('/auth/login', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json'
+            },
+            body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
+            credentials: 'same-origin'
+        })
+        .then(r => {
+            if (r.ok) {
+                return r.json();
+            } else {
+                return r.json().then(err => { throw new Error(err.error || 'Login failed'); });
+            }
+        })
+        .then(data => {
+            if (data.success) {
+                // Login successful, now create the event
+                if (window.pendingEvent) {
+                    return fetch('/events/api', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            title: window.pendingEvent.title,
+                            date: window.pendingEvent.date,
+                            event_type: window.pendingEvent.event_type,
+                            description: `Quick event created from dashboard`
+                        }),
+                        credentials: 'same-origin'
+                    });
+                }
+            } else {
+                throw new Error(data.error || 'Login failed');
+            }
+        })
+        .then(r => {
+            if (r && r.ok) {
+                return r.json();
+            }
+            throw new Error('Failed to create event');
+        })
+        .then(data => {
+            closeLoginModal();
+            // Reload page to show updated calendar
+            window.location.reload();
+        })
+        .catch(err => {
+            errorDiv.textContent = err.message || 'Invalid username or password. Please try again.';
+            errorDiv.style.display = 'block';
+        });
+    }
+    
+    function viewEventDetails(eventId) {
+        const e = events.find(ev => ev.id === eventId);
+        if (!e) return;
+        document.getElementById('event-detail-title').textContent = e.title || 'Event';
+        document.getElementById('event-detail-date').textContent = 'Date: ' + (e.date ? new Date(e.date).toLocaleDateString() : '—');
+        document.getElementById('event-detail-type').textContent = 'Type: ' + (e.event_type || 'event');
+        document.getElementById('event-detail-desc').textContent = e.description || '';
+        document.getElementById('event-detail-modal').style.display = 'flex';
+    }
+    
+    function closeEventDetailModal() {
+        document.getElementById('event-detail-modal').style.display = 'none';
+    }
+    
+    function editEventRequiresLogin() {
+        closeEventDetailModal();
+        document.getElementById('login-prompt-modal').style.display = 'flex';
+    }
+    
+    function closeLoginPromptModal() {
+        document.getElementById('login-prompt-modal').style.display = 'none';
+    }
+    
+    // Hidden sign-in: double-click "The Chores" or Ctrl x3
+    function openSigninModal() {
+        document.getElementById('signin-modal').style.display = 'flex';
+        document.getElementById('signin-username').value = '';
+        document.getElementById('signin-password').value = '';
+        document.getElementById('signin-error').style.display = 'none';
+        document.getElementById('signin-username').focus();
+    }
+    
+    function closeSigninModal() {
+        document.getElementById('signin-modal').style.display = 'none';
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        var titleEl = document.getElementById('the-chores-title');
+        if (titleEl) {
+            titleEl.addEventListener('dblclick', function(e) {
+                e.preventDefault();
+                openSigninModal();
+            });
+        }
+        var pCount = 0;
+        var pReset = null;
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'p' || e.key === 'P') {
+                pCount++;
+                clearTimeout(pReset);
+                if (pCount >= 3) {
+                    pCount = 0;
+                    openSigninModal();
+                } else {
+                    pReset = setTimeout(function() { pCount = 0; }, 800);
+                }
+            } else {
+                pCount = 0;
+            }
+        });
+    });
+    
+    document.getElementById('signin-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var username = document.getElementById('signin-username').value;
+        var password = document.getElementById('signin-password').value;
+        var errEl = document.getElementById('signin-error');
+        fetch('/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+            body: 'username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password),
+            credentials: 'same-origin'
+        })
+        .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data || {} }; }); })
+        .then(function(res) {
+            if (res.ok && res.data.success) {
+                closeSigninModal();
+                window.location.href = '/dashboard';
+            } else {
+                errEl.textContent = (res.data && res.data.error) || 'Invalid username or password.';
+                errEl.style.display = 'block';
+            }
+        })
+        .catch(function() {
+            errEl.textContent = 'Something went wrong. Please try again.';
+            errEl.style.display = 'block';
+        });
+    });
+    
+    // Load stats for public dashboard (no quick links anymore; keep for any future use)
+    function loadStats() {
+    }
+    
+    // Initialize
+    updateDateTime();
+    loadWeather();
+    loadStats();
+    loadCalendarData();
+    
+    // Update time every minute
+    setInterval(updateDateTime, 60000);
+</script>
+</body>
+</html>

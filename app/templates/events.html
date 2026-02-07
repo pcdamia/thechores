@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}Events - The Chores{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h2 class="page-title">Events</h2>
+        <button class="btn btn-primary" onclick="openCreateModal()">Add Event</button>
+    </div>
+    
+    <div class="cards-grid" id="events-grid">
+        <!-- Events loaded via JS -->
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+<div id="event-modal" class="modal">
+    <div class="modal-content glass-card" style="max-width: 480px;">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h3 id="modal-title">Add Event</h3>
+        <form id="event-form">
+            <input type="hidden" id="event-id">
+            <div class="form-group">
+                <label for="event-title">Title</label>
+                <input type="text" id="event-title" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="event-type">Type</label>
+                <select id="event-type" class="form-input">
+                    <option value="event">Event</option>
+                    <option value="shopping">Shopping</option>
+                    <option value="appointment">Appointment</option>
+                    <option value="birthday">Birthday</option>
+                    <option value="meeting">Meeting</option>
+                    <option value="reminder">Reminder</option>
+                    <option value="travel">Travel</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="event-date">Date</label>
+                    <input type="date" id="event-date" required class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="event-time">Time (optional)</label>
+                    <input type="time" id="event-time" class="form-input">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="event-description">Description</label>
+                <textarea id="event-description" class="form-input" rows="3"></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let events = [];
+    
+    function loadEvents() {
+        const start = new Date();
+        start.setMonth(0); start.setDate(1);
+        const end = new Date();
+        end.setFullYear(end.getFullYear() + 1);
+        const startStr = start.toISOString().slice(0, 10);
+        const endStr = end.toISOString().slice(0, 10);
+        fetch('/events/api?start_date=' + startStr + '&end_date=' + endStr)
+            .then(r => r.json())
+            .then(data => {
+                events = data;
+                renderEvents();
+            })
+            .catch(err => console.error('Error loading events:', err));
+    }
+    
+    function renderEvents() {
+        const grid = document.getElementById('events-grid');
+        if (!events.length) {
+            grid.innerHTML = '<p class="empty-state">No events yet. Add one to get started!</p>';
+            return;
+        }
+        const sorted = [...events].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        grid.innerHTML = sorted.map(ev => {
+            const typeLabel = (ev.event_type || 'event').replace(/^./, c => c.toUpperCase());
+            return `
+                <div class="glass-card card">
+                    <div class="card-header">
+                        <h3>${escapeHtml(ev.title)}</h3>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Date:</strong> ${ev.date || '—'}</p>
+                        ${ev.time ? `<p><strong>Time:</strong> ${ev.time}</p>` : ''}
+                        <p><strong>Type:</strong> ${typeLabel}</p>
+                        ${ev.description ? `<p style="color: var(--text-secondary);">${escapeHtml(ev.description)}</p>` : ''}
+                    </div>
+                    <div class="card-actions card-actions-bottom">
+                        <button type="button" class="btn-round-icon" onclick="editEvent(${ev.id})" title="Edit">✏️</button>
+                        <button type="button" class="btn-round-icon" onclick="deleteEvent(${ev.id})" title="Delete">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    function escapeHtml(s) {
+        if (!s) return '';
+        const div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
+    
+    function openCreateModal() {
+        document.getElementById('modal-title').textContent = 'Add Event';
+        document.getElementById('event-form').reset();
+        document.getElementById('event-id').value = '';
+        document.getElementById('event-date').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('event-modal').style.display = 'block';
+    }
+    
+    function editEvent(id) {
+        const ev = events.find(e => e.id === id);
+        if (!ev) return;
+        document.getElementById('modal-title').textContent = 'Edit Event';
+        document.getElementById('event-id').value = ev.id;
+        document.getElementById('event-title').value = ev.title || '';
+        document.getElementById('event-type').value = ev.event_type || 'event';
+        document.getElementById('event-date').value = ev.date || '';
+        document.getElementById('event-time').value = ev.time || '';
+        document.getElementById('event-description').value = ev.description || '';
+        document.getElementById('event-modal').style.display = 'block';
+    }
+    
+    function deleteEvent(id) {
+        if (!confirm('Delete this event?')) return;
+        fetch('/events/api/' + id, { method: 'DELETE' })
+            .then(() => loadEvents())
+            .catch(err => console.error(err));
+    }
+    
+    function closeModal() {
+        document.getElementById('event-modal').style.display = 'none';
+    }
+    
+    document.getElementById('event-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const id = document.getElementById('event-id').value;
+        const payload = {
+            title: document.getElementById('event-title').value,
+            event_type: document.getElementById('event-type').value,
+            date: document.getElementById('event-date').value,
+            time: document.getElementById('event-time').value || null,
+            description: document.getElementById('event-description').value || ''
+        };
+        const url = id ? '/events/api/' + id : '/events/api';
+        const method = id ? 'PUT' : 'POST';
+        fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(r => r.json())
+            .then(() => { closeModal(); loadEvents(); })
+            .catch(err => { console.error(err); alert('Failed to save.'); });
+    });
+    
+    loadEvents();
+</script>
+{% endblock %}

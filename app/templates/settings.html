@@ -1,0 +1,567 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - The Chores{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <h2 class="page-title">Profile Settings</h2>
+    
+    <div class="glass-card" style="max-width: 800px; margin: 0 auto;">
+        <form id="settings-form" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="display-name">Display Name</label>
+                <input type="text" id="display-name" class="form-input" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Profile Image</label>
+                <div style="display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px;">
+                    <div id="profile-container" style="position: relative; width: 150px; height: 150px; border-radius: 50%; overflow: hidden; border: 2px solid var(--glass-border);">
+                        <img id="profile-preview" src="" alt="Profile" style="position: absolute; top: 0; left: 0; border: none; display: none; cursor: move; user-select: none;">
+                        <canvas id="profile-canvas" style="display: none; position: absolute; top: 0; left: 0; border-radius: 50%; pointer-events: none;"></canvas>
+                        <div id="profile-placeholder" style="width: 150px; height: 150px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); color: var(--text-secondary); position: absolute; top: 0; left: 0;">
+                            Profile
+                        </div>
+                    </div>
+                    <div style="flex: 1;">
+                        <input type="file" id="profile-image" accept="image/*" style="display: none;">
+                        <input type="hidden" id="profile-crop-data">
+                        <button type="button" class="btn btn-primary" onclick="document.getElementById('profile-image').click()">Choose Profile Image</button>
+                        <p style="margin-top: 8px; font-size: 12px; color: var(--text-secondary);">Click and drag to position, use mouse wheel or buttons to zoom</p>
+                        <div id="profile-crop-controls" style="display: none; margin-top: 12px; gap: 8px; align-items: center;">
+                            <button type="button" class="btn btn-secondary" onclick="zoomProfile(-0.1)" style="font-size: 12px; padding: 6px 12px;">−</button>
+                            <button type="button" class="btn btn-secondary" onclick="zoomProfile(0.1)" style="font-size: 12px; padding: 6px 12px;">+</button>
+                            <button type="button" class="btn btn-secondary" onclick="resetProfileCrop()" style="font-size: 12px; padding: 6px 12px;">Reset</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Background Image</label>
+                <div style="margin-bottom: 16px;">
+                    <div style="position: relative; width: 100%; max-width: 400px; aspect-ratio: 16/9; border-radius: 8px; overflow: hidden; border: 2px solid var(--glass-border); margin-bottom: 12px;">
+                        <img id="background-preview" src="" alt="Background" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                        <div id="background-placeholder" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); color: var(--text-secondary);">
+                            Background
+                        </div>
+                    </div>
+                    <input type="file" id="background-image" accept="image/*" style="display: none;">
+                    <button type="button" class="btn btn-primary" onclick="document.getElementById('background-image').click()">Choose Background Image</button>
+                </div>
+                <div class="form-group" id="background-position-group" style="display: none;">
+                    <label for="background-position">Background Position</label>
+                    <select id="background-position" class="form-input">
+                        <option value="centered">Centered</option>
+                        <option value="tiled">Tiled</option>
+                        <option value="stretched">Stretched</option>
+                        <option value="fit">Fit</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Background Gradient</label>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <label for="gradient-color-1" style="min-width: 80px; color: var(--text-primary);">Color 1:</label>
+                        <input type="color" id="gradient-color-1" value="#667eea" style="width: 60px; height: 40px; border: 2px solid var(--glass-border); border-radius: 8px; cursor: pointer;">
+                        <input type="text" id="gradient-color-1-hex" value="#667eea" style="width: 100px; padding: 8px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.1); color: var(--text-primary);">
+                    </div>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <label for="gradient-color-2" style="min-width: 80px; color: var(--text-primary);">Color 2:</label>
+                        <input type="color" id="gradient-color-2" value="#764ba2" style="width: 60px; height: 40px; border: 2px solid var(--glass-border); border-radius: 8px; cursor: pointer;">
+                        <input type="text" id="gradient-color-2-hex" value="#764ba2" style="width: 100px; padding: 8px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.1); color: var(--text-primary);">
+                    </div>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <label for="gradient-color-3" style="min-width: 80px; color: var(--text-primary);">Color 3:</label>
+                        <input type="color" id="gradient-color-3" value="#f093fb" style="width: 60px; height: 40px; border: 2px solid var(--glass-border); border-radius: 8px; cursor: pointer;">
+                        <input type="text" id="gradient-color-3-hex" value="#f093fb" style="width: 100px; padding: 8px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.1); color: var(--text-primary);">
+                    </div>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <label for="gradient-angle" style="min-width: 80px; color: var(--text-primary);">Angle:</label>
+                        <input type="range" id="gradient-angle" min="0" max="360" value="135" style="flex: 1;">
+                        <input type="number" id="gradient-angle-value" value="135" min="0" max="360" style="width: 80px; padding: 8px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.1); color: var(--text-primary);">
+                        <span style="color: var(--text-secondary);">deg</span>
+                    </div>
+                    <div style="width: 100%; height: 60px; border-radius: 8px; border: 2px solid var(--glass-border); overflow: hidden;" id="gradient-preview"></div>
+                </div>
+                <input type="hidden" id="background-gradient">
+            </div>
+            
+            <div class="form-group">
+                <label for="color-code">Your color (for calendar)</label>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">Used on the dashboard calendar to show who is assigned to each task.</p>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <input type="color" id="color-code" value="#667eea" style="width: 60px; height: 40px; border: 2px solid var(--glass-border); border-radius: 8px; cursor: pointer;">
+                    <input type="text" id="color-code-hex" placeholder="#667eea" maxlength="7" style="width: 100px; padding: 8px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.1); color: var(--text-primary);">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="color-scheme">Color Scheme</label>
+                <select id="color-scheme" class="form-input">
+                    <option value="default">Default</option>
+                    <option value="dark">Dark</option>
+                    <option value="light">Light</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+#profile-preview {
+    cursor: move;
+    user-select: none;
+}
+</style>
+
+<script>
+    let settings = {};
+    let profileImage = null;
+    let profileScale = 1;
+    let profileOffsetX = 0;
+    let profileOffsetY = 0;
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    
+    function parseGradient(gradientStr) {
+        // Parse gradient string like "135deg, #667eea 0%, #764ba2 50%, #f093fb 100%"
+        if (!gradientStr) {
+            return { angle: 135, colors: ['#667eea', '#764ba2', '#f093fb'] };
+        }
+        
+        const parts = gradientStr.split(',');
+        let angle = 135;
+        const colors = [];
+        
+        // Extract angle from first part
+        const firstPart = parts[0].trim();
+        const angleMatch = firstPart.match(/(\d+)deg/);
+        if (angleMatch) {
+            angle = parseInt(angleMatch[1]);
+        }
+        
+        // Extract colors (they may have percentages)
+        for (let i = angleMatch ? 1 : 0; i < parts.length; i++) {
+            const part = parts[i].trim();
+            const colorMatch = part.match(/(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3}|rgb\([^)]+\)|rgba\([^)]+\))/);
+            if (colorMatch) {
+                colors.push(colorMatch[1]);
+            }
+        }
+        
+        // Ensure we have at least 3 colors
+        while (colors.length < 3) {
+            colors.push(colors[colors.length - 1] || '#667eea');
+        }
+        
+        return { angle: angle || 135, colors: colors.slice(0, 3) };
+    }
+    
+    function buildGradientString() {
+        const color1 = document.getElementById('gradient-color-1').value;
+        const color2 = document.getElementById('gradient-color-2').value;
+        const color3 = document.getElementById('gradient-color-3').value;
+        const angle = document.getElementById('gradient-angle').value;
+        
+        // Build gradient: angle, color1 0%, color2 50%, color3 100%
+        return `${angle}deg, ${color1} 0%, ${color2} 50%, ${color3} 100%`;
+    }
+    
+    function updateGradientPreview() {
+        const gradientStr = buildGradientString();
+        const preview = document.getElementById('gradient-preview');
+        preview.style.background = `linear-gradient(${gradientStr})`;
+        document.getElementById('background-gradient').value = gradientStr;
+    }
+    
+    function applyColorScheme(scheme) {
+        // Remove all color scheme classes
+        document.body.className = document.body.className.replace(/color-scheme-\w+/g, '');
+        // Add the new color scheme class
+        if (scheme && scheme !== 'custom') {
+            document.body.classList.add('color-scheme-' + scheme);
+        }
+    }
+    
+    function loadSettings() {
+        fetch('/settings/api')
+            .then(r => r.json())
+            .then(data => {
+                settings = data;
+                document.getElementById('display-name').value = data.name || '';
+                document.getElementById('background-position').value = data.background_position || 'centered';
+                document.getElementById('color-scheme').value = data.color_scheme || 'default';
+                applyColorScheme(data.color_scheme || 'default');
+                const hex = (data.color_code || '#667eea').replace(/^#?/, '#');
+                const colorCodeEl = document.getElementById('color-code');
+                const colorCodeHexEl = document.getElementById('color-code-hex');
+                if (colorCodeEl) colorCodeEl.value = hex;
+                if (colorCodeHexEl) colorCodeHexEl.value = hex;
+                
+                // Parse and load gradient
+                const gradient = parseGradient(data.background_gradient);
+                document.getElementById('gradient-color-1').value = gradient.colors[0];
+                document.getElementById('gradient-color-1-hex').value = gradient.colors[0];
+                document.getElementById('gradient-color-2').value = gradient.colors[1];
+                document.getElementById('gradient-color-2-hex').value = gradient.colors[1];
+                document.getElementById('gradient-color-3').value = gradient.colors[2];
+                document.getElementById('gradient-color-3-hex').value = gradient.colors[2];
+                document.getElementById('gradient-angle').value = gradient.angle;
+                document.getElementById('gradient-angle-value').value = gradient.angle;
+                updateGradientPreview();
+                
+                if (data.profile_image) {
+                    const img = new Image();
+                    img.onload = () => {
+                        // Set profileImage first so calculateInitialScale can use it
+                        profileImage = img;
+                        
+                        // Now set the preview src and display
+                        const preview = document.getElementById('profile-preview');
+                        preview.src = '/static/uploads/' + data.profile_image;
+                        preview.style.display = 'block';
+                        document.getElementById('profile-placeholder').style.display = 'none';
+                        
+                        const controls = document.getElementById('profile-crop-controls');
+                        if (controls) {
+                            controls.style.display = 'flex';
+                        }
+                        
+                        // Calculate initial scale to fit image in preview
+                        profileScale = calculateInitialScale();
+                        
+                        // Center the image initially
+                        const size = 150;
+                        const displayWidth = profileImage.width * profileScale;
+                        const displayHeight = profileImage.height * profileScale;
+                        profileOffsetX = Math.max(0, (displayWidth - size) / 2);
+                        profileOffsetY = Math.max(0, (displayHeight - size) / 2);
+                        
+                        updateProfileDisplay();
+                    };
+                    img.onerror = () => {
+                        console.error('Failed to load profile image:', data.profile_image);
+                    };
+                    img.src = '/static/uploads/' + data.profile_image;
+                }
+                
+                if (data.background_image) {
+                    document.getElementById('background-preview').src = '/static/uploads/' + data.background_image;
+                    document.getElementById('background-preview').style.display = 'block';
+                    document.getElementById('background-placeholder').style.display = 'none';
+                    document.getElementById('background-position-group').style.display = 'block';
+                }
+            });
+    }
+    
+    function updateProfileDisplay() {
+        const preview = document.getElementById('profile-preview');
+        if (!profileImage || !preview) return;
+        
+        const size = 150;
+        const scale = profileScale || 1;
+        
+        // Ensure profileImage has dimensions
+        if (!profileImage.width || !profileImage.height) {
+            console.warn('Profile image dimensions not available');
+            return;
+        }
+        
+        // Calculate the actual displayed size of the image (scaled)
+        const displayWidth = profileImage.width * scale;
+        const displayHeight = profileImage.height * scale;
+        
+        // Set the image's actual width and height based on scale
+        preview.style.width = displayWidth + 'px';
+        preview.style.height = displayHeight + 'px';
+        
+        // Constrain offsets to keep image within bounds
+        const maxOffsetX = Math.max(0, displayWidth - size);
+        const maxOffsetY = Math.max(0, displayHeight - size);
+        profileOffsetX = Math.max(0, Math.min(profileOffsetX || 0, maxOffsetX));
+        profileOffsetY = Math.max(0, Math.min(profileOffsetY || 0, maxOffsetY));
+        
+        // Position the image using absolute positioning (negative values move image left/up)
+        preview.style.left = (-profileOffsetX) + 'px';
+        preview.style.top = (-profileOffsetY) + 'px';
+    }
+    
+    function calculateInitialScale() {
+        if (!profileImage || !profileImage.width || !profileImage.height) return 1;
+        const size = 150;
+        // Calculate scale to fit image within preview (contain - show whole image)
+        // We want the image to fit completely within the circle
+        const scaleToFit = Math.min(size / profileImage.width, size / profileImage.height);
+        // Start with a scale that shows the whole image, slightly smaller to ensure it fits
+        return Math.max(0.1, Math.min(scaleToFit * 0.9, 1));
+    }
+    
+    function zoomProfile(delta) {
+        if (!profileImage) return;
+        const oldScale = profileScale;
+        // Allow zooming from 0.1 (very small) to 3 (3x larger)
+        profileScale = Math.max(0.1, Math.min(3, profileScale + delta));
+        
+        // Adjust offset to zoom towards center
+        const scaleChange = profileScale / oldScale;
+        profileOffsetX = profileOffsetX * scaleChange;
+        profileOffsetY = profileOffsetY * scaleChange;
+        
+        updateProfileDisplay();
+    }
+    
+    function resetProfileCrop() {
+        if (!profileImage) return;
+        // Reset to initial scale that fits the image
+        profileScale = calculateInitialScale();
+        
+        // Center the image
+        const size = 150;
+        const displayWidth = profileImage.width * profileScale;
+        const displayHeight = profileImage.height * profileScale;
+        profileOffsetX = Math.max(0, (displayWidth - size) / 2);
+        profileOffsetY = Math.max(0, (displayHeight - size) / 2);
+        
+        updateProfileDisplay();
+    }
+    
+    document.getElementById('profile-image').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    profileImage = img;
+                    document.getElementById('profile-preview').src = e.target.result;
+                    document.getElementById('profile-preview').style.display = 'block';
+                    document.getElementById('profile-placeholder').style.display = 'none';
+                    document.getElementById('profile-crop-controls').style.display = 'flex';
+                    
+                    // Calculate initial scale to fit image in preview
+                    profileScale = calculateInitialScale();
+                    
+                    // Center the image initially
+                    const size = 150;
+                    const displayWidth = profileImage.width * profileScale;
+                    const displayHeight = profileImage.height * profileScale;
+                    profileOffsetX = Math.max(0, (displayWidth - size) / 2);
+                    profileOffsetY = Math.max(0, (displayHeight - size) / 2);
+                    
+                    updateProfileDisplay();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+    
+    // Profile image drag and zoom
+    const profilePreview = document.getElementById('profile-preview');
+    let profileContainer = null;
+    
+    if (profilePreview) {
+        profileContainer = profilePreview.parentElement;
+        
+        profilePreview.addEventListener('mousedown', (e) => {
+            if (!profileImage) return;
+            e.preventDefault();
+            isDragging = true;
+            const rect = profileContainer.getBoundingClientRect();
+            dragStartX = e.clientX - rect.left - profileOffsetX;
+            dragStartY = e.clientY - rect.top - profileOffsetY;
+        });
+        
+        // Zoom with mouse wheel
+        profileContainer.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (!profileImage) return;
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            const oldScale = profileScale;
+            // Allow zooming from 0.1 (very small) to 3 (3x larger)
+            profileScale = Math.max(0.1, Math.min(3, profileScale * delta));
+            
+            // Adjust offset to zoom towards center
+            const scaleChange = profileScale / oldScale;
+            profileOffsetX = profileOffsetX * scaleChange;
+            profileOffsetY = profileOffsetY * scaleChange;
+            
+            updateProfileDisplay();
+        });
+    }
+    
+    // Mouse move and mouse up handlers (global, not tied to profileContainer)
+    document.addEventListener('mousemove', (e) => {
+        if (isDragging && profileImage && profileContainer) {
+            const rect = profileContainer.getBoundingClientRect();
+            profileOffsetX = e.clientX - rect.left - dragStartX;
+            profileOffsetY = e.clientY - rect.top - dragStartY;
+            updateProfileDisplay();
+        }
+    });
+    
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+    
+    document.getElementById('background-image').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('background-preview').src = e.target.result;
+                document.getElementById('background-preview').style.display = 'block';
+                document.getElementById('background-placeholder').style.display = 'none';
+                document.getElementById('background-position-group').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+    
+    // Gradient color picker event listeners
+    ['gradient-color-1', 'gradient-color-2', 'gradient-color-3'].forEach((id, index) => {
+        const colorPicker = document.getElementById(id);
+        const hexInput = document.getElementById(id + '-hex');
+        
+        colorPicker.addEventListener('input', (e) => {
+            hexInput.value = e.target.value;
+            updateGradientPreview();
+        });
+        
+        hexInput.addEventListener('input', (e) => {
+            const value = e.target.value;
+            if (/^#[0-9a-fA-F]{6}$/.test(value) || /^#[0-9a-fA-F]{3}$/.test(value)) {
+                colorPicker.value = value;
+                updateGradientPreview();
+            }
+        });
+    });
+    
+    // Gradient angle controls
+    const angleSlider = document.getElementById('gradient-angle');
+    const angleInput = document.getElementById('gradient-angle-value');
+    
+    angleSlider.addEventListener('input', (e) => {
+        angleInput.value = e.target.value;
+        updateGradientPreview();
+    });
+    
+    angleInput.addEventListener('input', (e) => {
+        const value = Math.max(0, Math.min(360, parseInt(e.target.value) || 135));
+        angleSlider.value = value;
+        angleInput.value = value;
+        updateGradientPreview();
+    });
+    
+    // Color scheme selector
+    const colorSchemeSelect = document.getElementById('color-scheme');
+    const colorCodePicker = document.getElementById('color-code');
+    const colorCodeHex = document.getElementById('color-code-hex');
+    if (colorCodePicker && colorCodeHex) {
+        colorCodePicker.addEventListener('input', () => { colorCodeHex.value = colorCodePicker.value; });
+        colorCodeHex.addEventListener('input', () => {
+            const v = colorCodeHex.value.trim();
+            if (/^#[0-9A-Fa-f]{6}$/.test(v) || /^[0-9A-Fa-f]{6}$/.test(v)) {
+                colorCodePicker.value = v.startsWith('#') ? v : '#' + v;
+            }
+        });
+    }
+    
+    colorSchemeSelect.addEventListener('change', (e) => {
+        applyColorScheme(e.target.value);
+    });
+    
+    document.getElementById('settings-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const formData = new FormData();
+        formData.append('name', document.getElementById('display-name').value);
+        formData.append('background_gradient', buildGradientString());
+        formData.append('background_position', document.getElementById('background-position').value);
+        formData.append('color_scheme', document.getElementById('color-scheme').value);
+        const colorCode = document.getElementById('color-code-hex').value.trim() || document.getElementById('color-code').value;
+        formData.append('color_code', colorCode);
+        
+        const profileFile = document.getElementById('profile-image').files[0];
+        if (profileFile && profileImage) {
+            formData.append('profile_image', profileFile);
+            // Calculate crop data relative to original image
+            // The preview is 150x150px circular, showing a portion of the scaled image
+            const previewSize = 150;
+            const originalWidth = profileImage.width;
+            const originalHeight = profileImage.height;
+            
+            // The image is displayed at: originalWidth * scale by originalHeight * scale
+            // The visible area in the preview (150x150) shows a portion of this scaled image
+            // profileOffsetX/Y is the offset in SCALED coordinates (pixels of the scaled image)
+            // We need to convert from scaled coordinates to original image coordinates
+            
+            // Convert offset from scaled coordinates to original coordinates
+            // profileOffsetX is in pixels of the scaled image, so divide by scale to get original pixels
+            const cropXInOriginal = profileOffsetX / profileScale;
+            const cropYInOriginal = profileOffsetY / profileScale;
+            
+            // The visible area in preview (150px square) corresponds to a portion of the scaled image
+            // Since the image is scaled by profileScale, the visible area in original coordinates is:
+            const visibleWidthInOriginal = previewSize / profileScale;
+            const visibleHeightInOriginal = previewSize / profileScale;
+            
+            // We want to crop a square, so use the smaller dimension
+            // Also ensure it doesn't exceed the image dimensions
+            const cropSize = Math.min(
+                visibleWidthInOriginal, 
+                visibleHeightInOriginal, 
+                originalWidth, 
+                originalHeight
+            );
+            
+            // Calculate the crop position, ensuring it stays within bounds
+            const x = Math.max(0, Math.min(cropXInOriginal, originalWidth - cropSize));
+            const y = Math.max(0, Math.min(cropYInOriginal, originalHeight - cropSize));
+            
+            // Final crop dimensions (always square)
+            const width = cropSize;
+            const height = cropSize;
+            
+            const cropData = {
+                x: Math.round(x),
+                y: Math.round(y),
+                width: Math.round(width),
+                height: Math.round(height)
+            };
+            formData.append('profile_crop', JSON.stringify(cropData));
+        }
+        
+        const backgroundFile = document.getElementById('background-image').files[0];
+        if (backgroundFile) {
+            formData.append('background_image', backgroundFile);
+        }
+        
+        fetch('/settings/api', {
+            method: 'PUT',
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('Settings saved successfully!');
+                location.reload();
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            alert('Error saving settings');
+        });
+    });
+    
+    loadSettings();
+</script>
+{% endblock %}

@@ -1,0 +1,24 @@
+{
+  "name": "The Chores",
+  "version": "1.5.1",
+  "slug": "thechores",
+  "description": "Chore and inventory tracking system with modern glass morphism UI",
+  "arch": ["aarch64", "amd64", "armhf", "armv7", "i386"],
+  "startup": "application",
+  "boot": "auto",
+  "ports": {
+    "5050/tcp": 5050
+  },
+  "ports_description": {
+    "5050/tcp": "Web interface"
+  },
+  "map": ["config:rw", "data:rw"],
+  "options": {
+    "log_level": "info",
+    "secret_key": ""
+  },
+  "schema": {
+    "log_level": "list(log_level|info|debug|warning|error|critical)",
+    "secret_key": "str?"
+  }
+}

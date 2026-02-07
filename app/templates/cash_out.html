@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Cash Out - The Chores{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h2 class="page-title">Cash Out</h2>
+        <a href="{{ url_for('store.store_page') }}" class="btn btn-secondary">Back to Chore Store</a>
+    </div>
+    
+    <div class="glass-card" style="max-width: 480px; padding: 24px;">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">Convert your tokens to cash at the current rate set by your admin.</p>
+        <p><strong>Your balance:</strong> <span id="cash-out-balance" style="color: #ffd700; font-size: 20px;">—</span> tokens</p>
+        <p style="font-size: 14px; color: var(--text-secondary); margin-top: 8px;">Rate: <span id="rate-info">—</span></p>
+        <p style="font-size: 14px; color: var(--text-secondary);">If you cash out all: <span id="dollar-value-all">—</span></p>
+        
+        <form id="cash-out-form" style="margin-top: 24px;">
+            <div class="form-group">
+                <label for="cash-out-tokens">Tokens to cash out</label>
+                <input type="number" id="cash-out-tokens" step="1" min="1" required class="form-input" placeholder="Enter amount">
+            </div>
+            <p style="font-size: 14px; color: var(--text-secondary);">You will receive: <strong id="estimated-dollars">$0.00</strong></p>
+            <div class="form-actions" style="margin-top: 16px;">
+                <button type="submit" class="btn btn-primary">Submit request</button>
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('cash-out-tokens').value = document.getElementById('cash-out-balance').textContent">Use all</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let info = {};
+    function loadInfo() {
+        fetch('/store/api/cash-out-info')
+            .then(r => r.json())
+            .then(data => {
+                info = data;
+                document.getElementById('cash-out-balance').textContent = Math.round(data.balance);
+                document.getElementById('rate-info').textContent = data.tokens_per_dollar + ' tokens = $1 (interest rate: ' + (parseFloat(data.cash_out_interest_rate || 1) * 100) + '%)';
+                document.getElementById('dollar-value-all').textContent = '$' + (data.dollar_value_if_cash_out_all || 0).toFixed(2);
+            });
+    }
+    document.getElementById('cash-out-tokens').addEventListener('input', function() {
+        const tokens = parseFloat(this.value) || 0;
+        if (!info.tokens_per_dollar) return;
+        const per = parseFloat(info.tokens_per_dollar);
+        const rate = parseFloat(info.cash_out_interest_rate || 1);
+        const dollars = per ? (tokens / per) * rate : 0;
+        document.getElementById('estimated-dollars').textContent = '$' + dollars.toFixed(2);
+    });
+    document.getElementById('cash-out-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const tokens = parseFloat(document.getElementById('cash-out-tokens').value);
+        if (!tokens || tokens <= 0) { alert('Enter a valid amount.'); return; }
+        const balance = parseFloat(document.getElementById('cash-out-balance').textContent);
+        if (tokens > balance) { alert('Not enough tokens.'); return; }
+        if (!confirm('Submit cash-out request for ' + tokens + ' tokens? You will receive the equivalent amount at the current rate.')) return;
+        fetch('/store/api/cash-out', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tokens: tokens })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { alert(data.error); return; }
+            document.getElementById('cash-out-balance').textContent = Math.round(data.balance);
+            document.getElementById('cash-out-tokens').value = '';
+            document.getElementById('estimated-dollars').textContent = '$0.00';
+            if (document.querySelector('.bank-float-amount'))
+                document.querySelector('.bank-float-amount').textContent = Math.round(data.balance);
+            alert('Request submitted! You will receive $' + data.dollar_value.toFixed(2) + '. An admin will process it.');
+            loadInfo();
+        })
+        .catch(() => alert('Request failed.'));
+    });
+    loadInfo();
+</script>
+{% endblock %}

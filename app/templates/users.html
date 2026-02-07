@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+
+{% block title %}Users - The Chores{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h2 class="page-title">User Management</h2>
+        <button class="btn btn-primary" onclick="openCreateModal()">Add User</button>
+    </div>
+    
+    <div class="cards-grid" id="users-grid">
+        <!-- Users will be loaded here -->
+    </div>
+</div>
+
+<!-- Create User Modal -->
+<div id="user-modal" class="modal">
+    <div class="modal-content glass-card">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h3>Add User</h3>
+        <form id="user-form">
+            <div class="form-group">
+                <label for="user-username">Username</label>
+                <input type="text" id="user-username" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="user-password">Password</label>
+                <input type="password" id="user-password" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="user-name">Name</label>
+                <input type="text" id="user-name" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="user-is-admin"> Admin User
+                </label>
+            </div>
+            <h4>Security Questions</h4>
+            <div class="form-group">
+                <label for="user-q1">Question 1</label>
+                <input type="text" id="user-q1" required class="form-input">
+                <label for="user-a1">Answer 1</label>
+                <input type="text" id="user-a1" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="user-q2">Question 2</label>
+                <input type="text" id="user-q2" required class="form-input">
+                <label for="user-a2">Answer 2</label>
+                <input type="text" id="user-a2" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="user-q3">Question 3</label>
+                <input type="text" id="user-q3" required class="form-input">
+                <label for="user-a3">Answer 3</label>
+                <input type="text" id="user-a3" required class="form-input">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Create User</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div id="edit-user-modal" class="modal" style="display: none;">
+    <div class="modal-content glass-card">
+        <span class="close" onclick="closeEditModal()">&times;</span>
+        <h3>Edit User</h3>
+        <form id="edit-user-form">
+            <input type="hidden" id="edit-user-id">
+            <div class="form-group">
+                <label for="edit-user-username">Username</label>
+                <input type="text" id="edit-user-username" class="form-input" readonly style="opacity: 0.8;">
+            </div>
+            <div class="form-group">
+                <label for="edit-user-name">Name</label>
+                <input type="text" id="edit-user-name" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="edit-user-title">Title</label>
+                <input type="text" id="edit-user-title" class="form-input" placeholder="Optional">
+            </div>
+            <div class="form-group">
+                <label for="edit-user-status">Status</label>
+                <select id="edit-user-status" class="form-input">
+                    <option value="">—</option>
+                    <option value="at_school">At school</option>
+                    <option value="at_work">At work</option>
+                    <option value="overnight_stay">Overnight stay</option>
+                    <option value="grocery_shopping">Grocery / food shopping</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="edit-user-bank">Tokens</label>
+                <input type="number" id="edit-user-bank" step="1" min="0" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="edit-user-is-admin"> Admin User
+                </label>
+            </div>
+            <div class="form-group">
+                <label for="edit-user-color">Color (for calendar)</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="color" id="edit-user-color" style="width: 48px; height: 36px; padding: 2px; cursor: pointer;">
+                    <input type="text" id="edit-user-color-hex" placeholder="#000000" class="form-input" style="flex: 1; max-width: 120px;">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- User Detail Modal -->
+<div id="detail-modal" class="modal" style="display: none;">
+    <div class="modal-content glass-card">
+        <span class="close" onclick="closeDetailModal()">&times;</span>
+        <h3 id="detail-name" style="color: var(--text-primary);">User</h3>
+        <div id="detail-content" style="color: var(--text-primary);">
+            <p id="detail-title-status"></p>
+            <p id="detail-tokens"></p>
+            <h4 style="margin-top: 16px;">Last chore completed</h4>
+            <p id="detail-last-chore"></p>
+            <h4>Last project completed</h4>
+            <p id="detail-last-project"></p>
+            <h4>Upcoming chores</h4>
+            <ul id="detail-upcoming-chores"></ul>
+            <h4>Upcoming projects</h4>
+            <ul id="detail-upcoming-projects"></ul>
+            <h4>Upcoming events</h4>
+            <ul id="detail-upcoming-events"></ul>
+        </div>
+        <div id="detail-actions" style="margin-top: 20px; display: flex; flex-wrap: wrap; gap: 12px;">
+            <a href="/dashboard" class="btn btn-primary" id="detail-btn-chores">Assign chores</a>
+            <a href="/projects/" class="btn btn-primary" id="detail-btn-projects">Assign projects</a>
+            <a href="/events/" class="btn btn-primary" id="detail-btn-events">Create event</a>
+        </div>
+    </div>
+</div>
+
+<!-- Profile image upload (hidden file input) -->
+<input type="file" id="profile-image-input" accept="image/*" style="display: none;">
+<script>
+    let currentUsers = [];
+    const STATUS_LABELS = { at_school: 'At school', at_work: 'At work', overnight_stay: 'Overnight stay', grocery_shopping: 'Grocery / food shopping' };
+
+    function loadUsers() {
+        fetch('/users/api')
+            .then(r => r.json())
+            .then(users => {
+                currentUsers = users.map(u => ({
+                    id: u.id,
+                    name: u.name,
+                    username: u.username,
+                    is_admin: u.is_admin,
+                    bank: typeof u.bank === 'number' ? u.bank.toFixed(2) : String(u.bank || '0.00'),
+                    color_code: u.color_code || null,
+                    profile_image: u.profile_image || null,
+                    background_gradient: u.background_gradient || null,
+                    status: u.status || null,
+                    title: u.title || null
+                }));
+                renderUsers(currentUsers);
+            });
+    }
+
+    function statusLabel(s) {
+        if (!s) return '';
+        return STATUS_LABELS[s] || s;
+    }
+
+    function cardStyle(user) {
+        const bg = user.background_gradient ? 'linear-gradient(' + user.background_gradient + ')' : (user.color_code || 'var(--glass-bg)');
+        return 'background: ' + (user.color_code ? user.color_code + '22' : 'var(--glass-bg)') + '; border-left: 4px solid ' + (user.color_code || '#6b7280') + ';';
+    }
+
+    function renderUsers(users) {
+        const grid = document.getElementById('users-grid');
+        if (users.length === 0) {
+            grid.innerHTML = '<p class="empty-state">No users found</p>';
+            return;
+        }
+        grid.innerHTML = users.map(user => {
+            const statusCap = user.status ? '<span class="user-status-caption" style="font-size: 12px; color: var(--text-secondary); display: block; margin-top: 4px;">' + statusLabel(user.status) + '</span>' : '';
+            const imgUrl = user.profile_image ? ('/static/uploads/' + user.profile_image + '?t=' + user.id) : '';
+            const avatarHtml = imgUrl
+                ? '<img src="' + imgUrl + '" alt="" class="user-card-avatar" onclick="event.stopPropagation(); openProfileImageUpload(' + user.id + ')" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; cursor: pointer;"><div class="user-card-avatar" style="display: none; width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.2); align-items: center; justify-content: center; font-size: 22px;">👤</div>'
+                : '<div class="user-card-avatar" onclick="event.stopPropagation(); openProfileImageUpload(' + user.id + ')" style="width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer;">👤</div>';
+            return `
+            <div class="glass-card card user-card" onclick="openDetailModal(${user.id})" style="${cardStyle(user)} cursor: pointer;">
+                <div class="card-header" style="display: flex; align-items: center; gap: 12px;">
+                    ${avatarHtml}
+                    <div style="flex: 1; min-width: 0;">
+                        <h3 style="margin: 0;">${user.name}</h3>
+                        ${user.title ? '<span style="font-size: 12px; color: var(--text-secondary);">' + user.title + '</span>' : ''}
+                        ${statusCap}
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p><strong>Username:</strong> ${user.username}</p>
+                    <p><strong>Role:</strong> ${user.is_admin ? 'Admin' : 'User'}</p>
+                    <p><strong>Tokens:</strong> ${user.bank}</p>
+                </div>
+                <div class="card-actions-bottom">
+                    <button onclick="event.stopPropagation(); openEditModal(${user.id})" class="btn-round-icon" title="Edit">✏️</button>
+                    <button onclick="event.stopPropagation(); resetPassword(${user.id})" class="btn-round-icon" title="Reset Password">🔑</button>
+                    <button onclick="event.stopPropagation(); deleteUser(${user.id})" class="btn-round-icon" title="Delete">🗑️</button>
+                </div>
+            </div>
+            `;
+        }).join('');
+    }
+
+    let currentDetailUserId = null;
+
+    function openDetailModal(userId) {
+        currentDetailUserId = userId;
+        fetch('/users/' + userId + '/api/detail')
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) { alert(data.error); return; }
+                document.getElementById('detail-name').textContent = data.name;
+                document.getElementById('detail-title-status').innerHTML = (data.title ? data.title + '<br>' : '') + (data.status ? statusLabel(data.status) : '');
+                document.getElementById('detail-tokens').textContent = 'Tokens: ' + (data.bank != null ? data.bank : '0');
+                document.getElementById('detail-last-chore').textContent = data.last_chore_task && data.last_chore_completed ? data.last_chore_task + ' — ' + data.last_chore_completed : '—';
+                document.getElementById('detail-last-project').textContent = data.last_project_name && data.last_project_completed ? data.last_project_name + ' — ' + data.last_project_completed : '—';
+                const ul = (arr, fmt) => (arr && arr.length) ? arr.map(fmt).join('') : '<li>—</li>';
+                document.getElementById('detail-upcoming-chores').innerHTML = ul(data.upcoming_chores || [], c => '<li>' + (c.task || '') + ' (' + (c.date || '') + ')</li>');
+                document.getElementById('detail-upcoming-projects').innerHTML = ul(data.upcoming_projects || [], p => '<li><a href="/projects/" style="color: var(--text-primary);">' + (p.name || '') + '</a></li>');
+                document.getElementById('detail-upcoming-events').innerHTML = ul(data.upcoming_events || [], e => '<li><a href="/events/" style="color: var(--text-primary);">' + (e.title || '') + ' (' + (e.date || '') + ')</a></li>');
+                document.getElementById('detail-btn-chores').href = '/dashboard';
+                document.getElementById('detail-btn-projects').href = '/projects/';
+                document.getElementById('detail-btn-events').href = '/events/?user_id=' + userId;
+                document.getElementById('detail-modal').style.display = 'block';
+            })
+            .catch(() => alert('Could not load user details.'));
+    }
+
+    function closeDetailModal() {
+        document.getElementById('detail-modal').style.display = 'none';
+        currentDetailUserId = null;
+    }
+
+    function openProfileImageUpload(userId) {
+        const input = document.getElementById('profile-image-input');
+        input.value = '';
+        input.dataset.userId = userId;
+        input.onchange = function() {
+            if (!this.files || !this.files[0]) return;
+            const fd = new FormData();
+            fd.append('profile_image', this.files[0]);
+            fetch('/users/' + userId + '/profile-image', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.error) { alert(data.error); return; }
+                    loadUsers();
+                })
+                .catch(() => alert('Upload failed.'));
+        };
+        input.click();
+    }
+    
+    function openCreateModal() {
+        window.location.href = '/users/create';
+    }
+    
+    function resetPassword(id) {
+        const newPassword = prompt('Enter new password (or leave blank for default "admin123"):') || 'admin123';
+        fetch(`/users/${id}/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ new_password: newPassword })
+        }).then(r => r.json())
+          .then(data => {
+              alert(data.message || 'Password reset');
+          });
+    }
+    
+    function deleteUser(id) {
+        if (!confirm('Are you sure you want to delete this user?')) return;
+        fetch(`/users/${id}/delete`, { method: 'POST' })
+            .then(() => { loadUsers(); if (currentDetailUserId === id) closeDetailModal(); });
+    }
+
+    function openEditModal(userId) {
+        const user = currentUsers.find(u => u.id == userId);
+        if (!user) return;
+        document.getElementById('edit-user-id').value = user.id;
+        document.getElementById('edit-user-username').value = user.username || '';
+        document.getElementById('edit-user-name').value = user.name || '';
+        document.getElementById('edit-user-title').value = user.title || '';
+        document.getElementById('edit-user-status').value = user.status || '';
+        document.getElementById('edit-user-bank').value = user.bank != null ? user.bank : '0.00';
+        document.getElementById('edit-user-is-admin').checked = !!user.is_admin;
+        const hex = (user.color_code || '#888888').replace(/^#?/, '#');
+        const colorVal = hex.length === 7 ? hex : '#888888';
+        document.getElementById('edit-user-color').value = colorVal;
+        document.getElementById('edit-user-color-hex').value = colorVal;
+        document.getElementById('edit-user-modal').style.display = 'block';
+    }
+
+    function closeEditModal() {
+        document.getElementById('edit-user-modal').style.display = 'none';
+    }
+
+    document.getElementById('edit-user-color').addEventListener('input', function() {
+        document.getElementById('edit-user-color-hex').value = this.value;
+    });
+    document.getElementById('edit-user-color-hex').addEventListener('input', function() {
+        const v = this.value.trim();
+        if (/^#[0-9A-Fa-f]{6}$/.test(v)) document.getElementById('edit-user-color').value = v;
+    });
+
+    document.getElementById('edit-user-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const id = document.getElementById('edit-user-id').value;
+        const payload = {
+            name: document.getElementById('edit-user-name').value.trim(),
+            title: document.getElementById('edit-user-title').value.trim() || null,
+            status: document.getElementById('edit-user-status').value || null,
+            bank: parseFloat(document.getElementById('edit-user-bank').value) || 0,
+            is_admin: document.getElementById('edit-user-is-admin').checked,
+            color_code: document.getElementById('edit-user-color-hex').value.trim() || null
+        };
+        if (payload.color_code && !/^#[0-9A-Fa-f]{6}$/.test(payload.color_code))
+            payload.color_code = null;
+        fetch(`/users/${id}/api`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { alert(data.error); return; }
+            closeEditModal();
+            loadUsers();
+        })
+        .catch(() => alert('Failed to save.'));
+    });
+
+    function closeModal() {
+        document.getElementById('user-modal').style.display = 'none';
+    }
+    
+    document.getElementById('user-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const formData = new FormData();
+        formData.append('username', document.getElementById('user-username').value);
+        formData.append('password', document.getElementById('user-password').value);
+        formData.append('name', document.getElementById('user-name').value);
+        formData.append('is_admin', document.getElementById('user-is-admin').checked ? 'on' : 'off');
+        formData.append('security_question_1', document.getElementById('user-q1').value);
+        formData.append('security_answer_1', document.getElementById('user-a1').value);
+        formData.append('security_question_2', document.getElementById('user-q2').value);
+        formData.append('security_answer_2', document.getElementById('user-a2').value);
+        formData.append('security_question_3', document.getElementById('user-q3').value);
+        formData.append('security_answer_3', document.getElementById('user-a3').value);
+        
+        fetch('/users/create', {
+            method: 'POST',
+            body: formData
+        }).then(() => {
+            closeModal();
+            loadUsers();
+        });
+    });
+    
+    const users = {{ users | tojson | safe }};
+    if (users && users.length > 0) {
+        currentUsers = users.map(u => ({
+            id: u.id,
+            name: u.name,
+            username: u.username,
+            is_admin: u.is_admin,
+            bank: u.bank != null ? (typeof u.bank === 'number' ? u.bank.toFixed(2) : String(u.bank)) : '0.00',
+            color_code: u.color_code || null,
+            profile_image: u.profile_image || null,
+            background_gradient: u.background_gradient || null,
+            status: u.status || null,
+            title: u.title || null
+        }));
+        renderUsers(currentUsers);
+    } else {
+        loadUsers();
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Token Settings - The Chores{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h2 class="page-title">Token Settings</h2>
+        <a href="{{ url_for('store.store_page') }}" class="btn btn-secondary">Back to Chore Store</a>
+    </div>
+    
+    <div class="glass-card" style="max-width: 480px; padding: 24px; margin-bottom: 32px;">
+        <h3 style="margin: 0 0 16px 0; font-size: 18px;">Conversion & interest</h3>
+        <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 16px;">These values determine how many tokens equal $1 when users cash out, and any bonus (interest) rate.</p>
+        <form id="token-settings-form">
+            <div class="form-group">
+                <label for="tokens-per-dollar">Tokens per $1</label>
+                <input type="number" id="tokens-per-dollar" step="1" min="1" required class="form-input" placeholder="e.g. 100">
+            </div>
+            <div class="form-group">
+                <label for="cash-out-interest-rate">Interest rate (e.g. 1.05 = 5% bonus)</label>
+                <input type="number" id="cash-out-interest-rate" step="0.01" min="0.01" required class="form-input" placeholder="e.g. 1.0 or 1.05">
+            </div>
+            <button type="submit" class="btn btn-primary">Save</button>
+        </form>
+    </div>
+    
+    <h3 style="margin-bottom: 16px; font-size: 20px;">Cash-out requests</h3>
+    <div id="cash-out-requests-list" class="cards-grid" style="grid-template-columns: 1fr;">
+        <p style="color: var(--text-secondary);">Loading...</p>
+    </div>
+</div>
+
+<script>
+    function loadSettings() {
+        fetch('/store/api/token-settings')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('tokens-per-dollar').value = data.tokens_per_dollar || '100';
+                document.getElementById('cash-out-interest-rate').value = data.cash_out_interest_rate || '1.0';
+            });
+    }
+    document.getElementById('token-settings-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        fetch('/store/api/token-settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                tokens_per_dollar: document.getElementById('tokens-per-dollar').value,
+                cash_out_interest_rate: document.getElementById('cash-out-interest-rate').value
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { alert(data.error); return; }
+            alert('Saved.');
+        });
+    });
+    function loadCashOutRequests() {
+        fetch('/store/api/cash-out-requests')
+            .then(r => r.json())
+            .then(requests => {
+                const el = document.getElementById('cash-out-requests-list');
+                const pending = requests.filter(r => r.status === 'pending');
+                const paid = requests.filter(r => r.status === 'paid');
+                if (pending.length === 0 && paid.length === 0) {
+                    el.innerHTML = '<p class="empty-state">No cash-out requests yet.</p>';
+                    return;
+                }
+                el.innerHTML = pending.map(r => `
+                    <div class="glass-card card" style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <strong>${r.user_name}</strong> (${r.username}) — ${r.tokens} tokens → $${r.dollar_value.toFixed(2)}
+                            <div style="font-size: 12px; color: var(--text-secondary);">${r.created_at ? new Date(r.created_at).toLocaleString() : ''}</div>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="markPaid(${r.id}, this)">Mark paid</button>
+                    </div>
+                `).join('') + (paid.length ? '<h4 style="margin-top: 24px; font-size: 16px;">Paid</h4>' + paid.map(r => `
+                    <div class="glass-card card" style="opacity: 0.8;">
+                        <strong>${r.user_name}</strong> — ${r.tokens} tokens → $${r.dollar_value.toFixed(2)} (paid)
+                    </div>
+                `).join('') : '');
+            });
+    }
+    function markPaid(id, btn) {
+        btn.disabled = true;
+        fetch('/store/api/cash-out-requests/' + id + '/paid', { method: 'PATCH' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) loadCashOutRequests();
+            })
+            .finally(() => { btn.disabled = false; });
+    }
+    loadSettings();
+    loadCashOutRequests();
+</script>
+{% endblock %}
