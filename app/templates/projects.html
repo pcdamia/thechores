@@ -1,0 +1,354 @@
+{% extends "base.html" %}
+
+{% block title %}Projects - The Chores{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h2 class="page-title">Projects</h2>
+        <button class="btn btn-primary" onclick="openCreateModal()">Add Project</button>
+    </div>
+    
+    <div class="cards-grid" id="projects-grid">
+        <!-- Active projects will be loaded here -->
+    </div>
+    
+    <div style="margin-top: 48px;">
+        <h3 style="margin-bottom: 24px; color: var(--text-primary); font-size: 24px; font-weight: 600;">Completed Projects</h3>
+        <div id="completed-projects-container">
+            <!-- Completed projects grouped by date will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+<div id="project-modal" class="modal">
+    <div class="modal-content glass-card">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h3 id="modal-title">Add Project</h3>
+        <form id="project-form">
+            <input type="hidden" id="project-id">
+            <div class="form-group">
+                <label for="project-name">Name</label>
+                <input type="text" id="project-name" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="project-users">Assigned Users</label>
+                <select id="project-users" class="form-input" multiple size="4">
+                    {% for user in users %}
+                    <option value="{{ user.id }}">{{ user.name }}</option>
+                    {% endfor %}
+                </select>
+                <small class="text-secondary">Hold Ctrl/Cmd to select multiple.</small>
+            </div>
+            <div class="form-group">
+                <label for="project-description">Description</label>
+                <textarea id="project-description" class="form-input" rows="4"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="project-severity">Severity</label>
+                <select id="project-severity" class="form-input">
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="project-reward">Tokens</label>
+                <input type="number" id="project-reward" step="1" class="form-input">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Detail Modal (view/edit notes, complete, need more details) -->
+<div id="detail-modal" class="modal">
+    <div class="modal-content glass-card">
+        <span class="close" onclick="closeDetailModal()">&times;</span>
+        <h3 id="detail-title" style="color: var(--text-primary);">Project</h3>
+        <div id="detail-content">
+            <p id="detail-description" style="color: var(--text-primary);"></p>
+            <p id="detail-assignees" style="color: var(--text-secondary);"></p>
+            <p id="detail-severity-reward" style="color: var(--text-secondary);"></p>
+            <div class="form-group">
+                <label for="detail-notes">Assignee notes</label>
+                <textarea id="detail-notes" class="form-input" rows="3" style="color: var(--text-primary);"></textarea>
+                <button type="button" class="btn btn-secondary" onclick="saveDetailNotes()" style="margin-top: 8px;">Save notes</button>
+            </div>
+            <div id="detail-complete-photo" style="margin-top: 16px;"></div>
+            <div id="detail-actions" style="margin-top: 20px; display: flex; flex-wrap: wrap; gap: 12px;">
+                <button type="button" class="btn btn-primary" id="btn-mark-complete">Mark complete</button>
+                <button type="button" class="btn btn-secondary" onclick="requestMoreDetails()">Need more details</button>
+                <button type="button" class="btn btn-secondary" onclick="openEditFromDetail()">Edit project</button>
+            </div>
+        </div>
+        <div id="detail-complete-form" style="display: none; margin-top: 16px; padding: 16px; border: 1px solid var(--glass-border); border-radius: 12px;">
+            <p style="color: var(--text-primary); margin-bottom: 12px;">Optional: upload a photo of the completed project.</p>
+            <input type="file" id="complete-photo-input" accept="image/*" class="form-input">
+            <div style="margin-top: 12px; display: flex; gap: 8px;">
+                <button type="button" class="btn btn-primary" id="btn-confirm-complete">Mark complete</button>
+                <button type="button" class="btn btn-secondary" onclick="cancelCompleteForm()">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let projects = [];
+    let usersList = {{ users | tojson | safe }};
+    
+    function loadProjects() {
+        fetch('/projects/api')
+            .then(r => r.json())
+            .then(data => {
+                projects = data;
+                renderProjects();
+            });
+        loadCompletedProjects();
+    }
+    
+    function loadCompletedProjects() {
+        fetch('/projects/api/completed')
+            .then(r => r.json())
+            .then(data => {
+                renderCompletedProjects(data);
+            })
+            .catch(err => {
+                console.error('Error loading completed projects:', err);
+            });
+    }
+    
+    function renderCompletedProjects(groupedData) {
+        const container = document.getElementById('completed-projects-container');
+        if (!groupedData || Object.keys(groupedData).length === 0) {
+            container.innerHTML = '<p class="empty-state" style="color: var(--text-secondary);">No completed projects yet.</p>';
+            return;
+        }
+        
+        const sortedDates = Object.keys(groupedData).sort((a, b) => new Date(b) - new Date(a));
+        
+        container.innerHTML = sortedDates.map(dateStr => {
+            const date = new Date(dateStr);
+            const dateFormatted = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            const items = groupedData[dateStr];
+            
+            return `
+                <div style="margin-bottom: 32px;">
+                    <h4 style="margin-bottom: 16px; color: var(--text-primary); font-size: 18px; font-weight: 600; border-bottom: 2px solid var(--glass-border); padding-bottom: 8px;">
+                        ${dateFormatted}
+                    </h4>
+                    <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+                        ${items.map(item => {
+                            const severityClass = 'severity-' + (item.severity || 'low');
+                            const color = item.color_code || '#6b7280';
+                            return `
+                            <div class="glass-card" style="padding: 12px 16px; min-width: 200px; flex: 0 1 auto; border-left: 4px solid ${color};">
+                                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">${item.name}</div>
+                                ${(item.user_names && item.user_names.length) ? `<div style="font-size: 12px; color: var(--text-secondary);">${item.user_names.join(', ')}</div>` : (item.user_name ? `<div style="font-size: 12px; color: var(--text-secondary);">${item.user_name}</div>` : '')}
+                                ${item.completed_by_name ? `<div style="font-size: 11px; color: var(--text-secondary);">Completed by ${item.completed_by_name}</div>` : ''}
+                                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                                    <span class="severity-badge ${severityClass}">${item.severity || '—'}</span>
+                                </div>
+                                ${item.reward > 0 ? `<div style="font-size: 12px; margin-top: 4px;">Tokens: ${item.reward}</div>` : ''}
+                                ${item.completed_photo ? `<div style="margin-top: 8px;"><img src="/static/uploads/${item.completed_photo}" alt="Completed" style="max-width: 120px; max-height: 80px; object-fit: cover; border-radius: 8px;"></div>` : ''}
+                            </div>
+                        `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    function renderProjects() {
+        const grid = document.getElementById('projects-grid');
+        if (projects.length === 0) {
+            grid.innerHTML = '<p class="empty-state">No projects yet. Add one to get started!</p>';
+            return;
+        }
+        grid.innerHTML = projects.map(project => {
+            const severityClass = 'severity-' + (project.severity || 'low');
+            const assigneeLabel = (project.user_names && project.user_names.length) ? project.user_names.join(', ') : (project.user_name || 'Unassigned');
+            return `
+                <div class="glass-card card ${severityClass}" onclick="openDetailModal(${project.id})" style="cursor: pointer;">
+                    <div class="card-header">
+                        <h3>${project.name}</h3>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Assigned to:</strong> ${assigneeLabel}</p>
+                        <p><strong>Severity:</strong> <span class="severity-badge ${severityClass}">${project.severity || '—'}</span></p>
+                        <p><strong>Tokens:</strong> ${project.reward}</p>
+                        <p><strong>Description:</strong> ${project.description || 'No description'}</p>
+                    </div>
+                    <div class="card-actions-bottom">
+                        <button onclick="event.stopPropagation(); completeProject(${project.id})" class="btn-round-icon" title="Mark complete">✓</button>
+                        <button onclick="event.stopPropagation(); editProject(${project.id})" class="btn-round-icon" title="Edit">✏️</button>
+                        <button onclick="event.stopPropagation(); deleteProject(${project.id})" class="btn-round-icon" title="Delete">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    let currentDetailId = null;
+    
+    function openDetailModal(id) {
+        const project = projects.find(p => p.id === id);
+        if (!project) return;
+        currentDetailId = id;
+        document.getElementById('detail-title').textContent = project.name;
+        document.getElementById('detail-description').textContent = project.description || 'No description';
+        document.getElementById('detail-assignees').textContent = 'Assigned to: ' + ((project.user_names && project.user_names.length) ? project.user_names.join(', ') : (project.user_name || 'Unassigned'));
+        document.getElementById('detail-severity-reward').textContent = 'Severity: ' + (project.severity || '—') + ' · Tokens: ' + project.reward;
+        document.getElementById('detail-notes').value = project.assignee_notes || '';
+        document.getElementById('detail-complete-form').style.display = 'none';
+        document.getElementById('detail-actions').style.display = 'flex';
+        document.getElementById('btn-mark-complete').onclick = function() {
+            document.getElementById('detail-complete-form').style.display = 'block';
+            document.getElementById('detail-actions').style.display = 'none';
+        };
+        document.getElementById('btn-confirm-complete').onclick = function() { confirmCompleteWithPhoto(id); };
+        document.getElementById('detail-modal').style.display = 'block';
+    }
+    
+    function closeDetailModal() {
+        document.getElementById('detail-modal').style.display = 'none';
+        currentDetailId = null;
+    }
+    
+    function cancelCompleteForm() {
+        document.getElementById('detail-complete-form').style.display = 'none';
+        document.getElementById('detail-actions').style.display = 'flex';
+        document.getElementById('complete-photo-input').value = '';
+    }
+    
+    function saveDetailNotes() {
+        if (!currentDetailId) return;
+        const notes = document.getElementById('detail-notes').value;
+        fetch(`/projects/api/${currentDetailId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assignee_notes: notes })
+        }).then(() => {
+            const p = projects.find(x => x.id === currentDetailId);
+            if (p) p.assignee_notes = notes;
+        });
+    }
+    
+    function requestMoreDetails() {
+        if (!currentDetailId) return;
+        fetch(`/projects/api/${currentDetailId}/request-details`, { method: 'POST' })
+            .then(r => {
+                if (!r.ok) return r.json().then(d => Promise.reject(d && d.error ? d.error : 'Request failed'));
+                return r.json();
+            })
+            .then(() => {
+                alert('Assignees have been notified. They will see the alert in their Notifications and profile badge.');
+            })
+            .catch(err => {
+                alert('Could not send alert: ' + (typeof err === 'string' ? err : 'Please try again.'));
+            });
+    }
+    
+    function openEditFromDetail() {
+        if (currentDetailId) editProject(currentDetailId);
+        closeDetailModal();
+    }
+    
+    function confirmCompleteWithPhoto(id) {
+        const form = document.getElementById('detail-complete-form');
+        const fileInput = document.getElementById('complete-photo-input');
+        const fd = new FormData();
+        if (fileInput.files && fileInput.files[0]) fd.append('photo', fileInput.files[0]);
+        fetch(`/projects/api/${id}/complete`, { method: 'POST', body: fd })
+            .then(() => {
+                cancelCompleteForm();
+                closeDetailModal();
+                loadProjects();
+                if (typeof location !== 'undefined') location.reload();
+            });
+    }
+    
+    function openCreateModal() {
+        document.getElementById('modal-title').textContent = 'Add Project';
+        document.getElementById('project-form').reset();
+        document.getElementById('project-id').value = '';
+        const sel = document.getElementById('project-users');
+        for (let i = 0; i < sel.options.length; i++) sel.options[i].selected = false;
+        document.getElementById('project-modal').style.display = 'block';
+    }
+    
+    function editProject(id) {
+        const project = projects.find(p => p.id === id);
+        if (!project) return;
+        document.getElementById('modal-title').textContent = 'Edit Project';
+        document.getElementById('project-id').value = project.id;
+        document.getElementById('project-name').value = project.name;
+        const uids = project.user_ids && project.user_ids.length ? project.user_ids : (project.user_id ? [project.user_id] : []);
+        const sel = document.getElementById('project-users');
+        for (let i = 0; i < sel.options.length; i++) {
+            sel.options[i].selected = uids.indexOf(parseInt(sel.options[i].value)) !== -1;
+        }
+        document.getElementById('project-description').value = project.description || '';
+        document.getElementById('project-severity').value = project.severity || 'low';
+        document.getElementById('project-reward').value = project.reward || '';
+        document.getElementById('project-modal').style.display = 'block';
+    }
+    
+    function completeProject(id) {
+        if (!confirm('Mark this project as completed?')) return;
+        fetch(`/projects/api/${id}/complete`, { method: 'POST' })
+            .then(() => {
+                loadProjects();
+                if (typeof location !== 'undefined') location.reload();
+            });
+    }
+    
+    function deleteProject(id) {
+        if (!confirm('Are you sure you want to delete this project?')) return;
+        fetch(`/projects/api/${id}`, { method: 'DELETE' })
+            .then(() => { loadProjects(); if (currentDetailId === id) closeDetailModal(); });
+    }
+    
+    function closeModal() {
+        document.getElementById('project-modal').style.display = 'none';
+    }
+    
+    document.getElementById('project-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = document.getElementById('project-id').value;
+        const sel = document.getElementById('project-users');
+        const userIds = Array.from(sel.selectedOptions).map(o => parseInt(o.value));
+        if (userIds.length === 0) {
+            alert('Select at least one assigned user.');
+            return;
+        }
+        const data = {
+            name: document.getElementById('project-name').value,
+            user_ids: userIds,
+            description: document.getElementById('project-description').value,
+            severity: document.getElementById('project-severity').value,
+            reward: parseFloat(document.getElementById('project-reward').value) || 0
+        };
+        
+        const url = id ? `/projects/api/${id}` : '/projects/api';
+        const method = id ? 'PUT' : 'POST';
+        
+        fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        }).then(() => {
+            closeModal();
+            loadProjects();
+        });
+    });
+    
+    loadProjects();
+</script>
+{% endblock %}

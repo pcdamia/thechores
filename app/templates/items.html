@@ -1,0 +1,483 @@
+{% extends "base.html" %}
+
+{% block title %}Items - The Chores{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <h2 class="page-title">Items</h2>
+            <button type="button" class="page-info-btn" id="items-info-btn" title="What is this page?">ⓘ</button>
+        </div>
+        <button class="btn btn-primary" onclick="openCreateModal()">Add Item</button>
+    </div>
+    
+    <div class="cards-grid mosaic" id="items-grid">
+        <!-- Items will be loaded here -->
+    </div>
+</div>
+
+<!-- Page description modal -->
+<div id="page-info-modal" class="modal" style="display: none;">
+    <div class="modal-content glass-card" style="max-width: 480px;">
+        <span class="close" onclick="closePageInfo()">&times;</span>
+        <h3 style="margin: 0 0 12px 0;">About this page</h3>
+        <p style="color: var(--text-secondary); line-height: 1.6; margin: 0;">
+            This page is where you can <strong>request items</strong> for the next grocery or house shopping trip. Add items you need; admins can fill in purchase frequency, last purchase date, and usage details. Choose a preferred store from the Stores list, or add a new store if needed.
+        </p>
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+<div id="item-modal" class="modal">
+    <div class="modal-content glass-card" style="max-height: 90vh; overflow-y: auto;">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h3 id="modal-title">Add Item</h3>
+        <form id="item-form" enctype="multipart/form-data">
+            <input type="hidden" id="item-id">
+            <div class="form-group">
+                <label for="item-name">Name</label>
+                <input type="text" id="item-name" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label>Item Image</label>
+                <div style="margin-bottom: 16px;">
+                    <img id="item-image-preview" src="" alt="Item" style="width: 150px; height: 150px; border-radius: 8px; object-fit: cover; border: 2px solid var(--glass-border); display: none; margin-bottom: 8px;">
+                    <input type="file" id="item-image" accept="image/*" style="display: none;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('item-image').click()">Choose Image</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="item-store">Store (optional)</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <select id="item-store" class="form-input" style="flex: 1;">
+                        <option value="">— None —</option>
+                    </select>
+                    <button type="button" class="btn btn-secondary" onclick="openAddStorePrompt()">Add new store</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Categories (up to 5)</label>
+                <div id="category-picker-container">
+                    <div style="position: relative;">
+                        <input type="text" id="category-input" class="form-input" placeholder="Type to search or add category" autocomplete="off">
+                        <div id="category-suggestions" class="category-suggestions" style="display: none;"></div>
+                    </div>
+                    <div id="category-chips" class="category-chips" style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px;"></div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="item-quantity">Quantity</label>
+                    <input type="number" id="item-quantity" step="0.01" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="item-unit">Unit Type</label>
+                    <input type="text" id="item-unit" class="form-input" placeholder="e.g., lbs, oz, count">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="item-full">Full Amount</label>
+                    <input type="number" id="item-full" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="item-low">Low Amount</label>
+                    <input type="number" id="item-low" class="form-input">
+                </div>
+            </div>
+            {% if current_user.is_admin %}
+            <div class="form-group">
+                <label for="item-purchase-freq">Purchase Frequency</label>
+                <input type="text" id="item-purchase-freq" class="form-input" placeholder="e.g., weekly, monthly">
+            </div>
+            <div class="form-group">
+                <label for="item-last-purchase">Last Purchase Date</label>
+                <input type="date" id="item-last-purchase" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="item-usage-freq">Usage Frequency (optional)</label>
+                <input type="text" id="item-usage-freq" class="form-input">
+            </div>
+            {% endif %}
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.category-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.category-chip {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 6px 12px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+.category-chip-remove {
+    cursor: pointer;
+    font-weight: bold;
+}
+.category-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    margin-top: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+.category-suggestion {
+    padding: 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--glass-border);
+}
+.category-suggestion:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+.category-suggestion:last-child {
+    border-bottom: none;
+}
+</style>
+
+<script>
+    const isAdmin = {{ 'true' if current_user.is_admin else 'false' }};
+    let items = [];
+    let stores = [];
+    let selectedCategories = [];
+    let allCategories = [];
+    let categoryInputTimeout;
+
+    document.getElementById('items-info-btn').addEventListener('click', function() {
+        document.getElementById('page-info-modal').style.display = 'block';
+    });
+    function closePageInfo() {
+        document.getElementById('page-info-modal').style.display = 'none';
+    }
+    document.getElementById('page-info-modal').addEventListener('click', function(e) {
+        if (e.target === this) closePageInfo();
+    });
+
+    function loadStores() {
+        return fetch('/stores/api')
+            .then(r => r.json())
+            .then(data => {
+                stores = data || [];
+                const sel = document.getElementById('item-store');
+                if (!sel) return;
+                sel.innerHTML = '<option value="">— None —</option>' + stores.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            });
+    }
+    function openAddStorePrompt() {
+        const name = prompt('New store name:');
+        if (!name || !name.trim()) return;
+        fetch('/stores/api', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name.trim(), budget: 0 })
+        })
+        .then(r => r.json())
+        .then(store => {
+            stores.push(store);
+            const sel = document.getElementById('item-store');
+            const opt = document.createElement('option');
+            opt.value = store.id;
+            opt.textContent = store.name;
+            opt.selected = true;
+            sel.appendChild(opt);
+        })
+        .catch(() => alert('Failed to add store. Try the Stores page.'));
+    }
+    
+    function loadItems() {
+        fetch('/items/api')
+            .then(r => r.json())
+            .then(data => {
+                items = data;
+                renderItems();
+            });
+    }
+    
+    function loadCategories() {
+        fetch('/categories/api?type=item')
+            .then(r => r.json())
+            .then(data => {
+                allCategories = data;
+            });
+    }
+    
+    function escapeHtml(s) {
+        if (s == null) return '';
+        const div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
+    function parseCategoryNamesForDisplay(val) {
+        if (val == null) return [];
+        if (Array.isArray(val)) return val.map(x => (x != null ? String(x).trim() : '')).filter(Boolean);
+        const s = String(val).trim();
+        if (!s) return [];
+        if (s.startsWith('[')) {
+            try {
+                const parsed = JSON.parse(s);
+                if (Array.isArray(parsed)) return parsed.map(x => (x != null ? String(x).trim() : '')).filter(Boolean);
+                return [String(parsed).trim()].filter(Boolean);
+            } catch (_) {}
+        }
+        return s.split(',').map(x => x.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+    }
+    function renderItems() {
+        const grid = document.getElementById('items-grid');
+        if (items.length === 0) {
+            grid.innerHTML = '<p class="empty-state">No items yet. Add one to get started!</p>';
+            return;
+        }
+        const uploads = (path) => path ? String(path).replace(/^uploads\//, '') : '';
+        grid.innerHTML = items.map(item => {
+            const qty = Number(item.quantity) || 0;
+            const low = Number(item.low_amount) || 0;
+            const full = Number(item.full_amount) || low || 1;
+            const pct = full > 0 ? Math.min(100, (qty / full) * 100) : (qty > 0 ? 100 : 0);
+            let statusClass = 'item-status-in-stock';
+            let statusText = 'In Stock';
+            if (qty <= 0) {
+                statusClass = 'item-status-out';
+                statusText = 'Out of Stock';
+            } else if (item.is_low) {
+                statusClass = 'item-status-low';
+                statusText = 'Low Stock';
+            }
+            const storeIds = item.store_ids || (item.store_id != null ? [item.store_id] : []);
+            const storeNames = item.store_names || (item.store_name ? [item.store_name] : []);
+            const storeLogos = item.store_logos || (item.store_logo != null ? [item.store_logo] : []);
+            const storeChips = storeIds.map((sid, i) => {
+                const name = storeNames[i] != null ? storeNames[i] : '';
+                const logo = storeLogos[i];
+                const logoUrl = logo ? '/static/uploads/' + uploads(logo) : '';
+                return logoUrl
+                    ? `<span class="store-chip"><img class="store-chip-logo" src="${logoUrl}" alt="" onerror="this.style.display='none'"><span>${escapeHtml(name)}</span></span>`
+                    : `<span class="store-chip">${escapeHtml(name)}</span>`;
+            }).join(' ');
+            const barColor = qty <= 0 ? '#ef4444' : item.is_low ? '#f59e0b' : '#22c55e';
+            return `
+            <div class="glass-card card item-mosaic-card">
+                <span class="item-status-pill ${statusClass}">${statusText}</span>
+                <div class="item-image-wrap">
+                    ${item.image ? `<img src="/static/uploads/${uploads(item.image)}" alt="${escapeHtml(item.name)}" onerror="this.style.display='none'">` : '<span style="color: var(--text-secondary); font-size: 14px;">No image</span>'}
+                </div>
+                <h3 style="margin: 0 0 8px 0; font-size: 16px;">${escapeHtml(item.name)}</h3>
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text-secondary);">
+                    <span style="color: ${barColor};">↑</span>
+                    <span>${qty} in stock</span>
+                </div>
+                <div class="item-qty-bar">
+                    <div class="item-qty-bar-fill" style="width: ${pct}%; background: ${barColor};"></div>
+                </div>
+                ${storeChips ? `<div style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px;">${storeChips}</div>` : ''}
+                <div class="card-actions" style="margin-top: auto; padding-top: 12px; justify-content: space-evenly; border-top: 1px solid var(--glass-border);">
+                    <button onclick="editItem(${item.id})" class="btn-icon" title="Edit">✏️</button>
+                    <button onclick="deleteItem(${item.id})" class="btn-icon" title="Delete">🗑️</button>
+                </div>
+            </div>
+            `;
+        }).join('');
+    }
+    
+    function addCategory(name) {
+        if (selectedCategories.length >= 5) {
+            alert('Maximum 5 categories allowed');
+            return;
+        }
+        if (selectedCategories.includes(name)) {
+            return;
+        }
+        selectedCategories.push(name);
+        renderCategoryChips();
+        document.getElementById('category-input').value = '';
+        document.getElementById('category-suggestions').style.display = 'none';
+    }
+    
+    function removeCategory(name) {
+        selectedCategories = selectedCategories.filter(c => c !== name);
+        renderCategoryChips();
+    }
+    
+    function renderCategoryChips() {
+        const container = document.getElementById('category-chips');
+        container.innerHTML = selectedCategories.map(cat => `
+            <div class="category-chip">
+                ${cat}
+                <span class="category-chip-remove" onclick="removeCategory('${cat}')">×</span>
+            </div>
+        `).join('');
+    }
+    
+    function searchCategories(query) {
+        if (!query) {
+            document.getElementById('category-suggestions').style.display = 'none';
+            return;
+        }
+        
+        fetch(`/categories/api/search?q=${encodeURIComponent(query)}&type=item`)
+            .then(r => r.json())
+            .then(suggestions => {
+                const container = document.getElementById('category-suggestions');
+                const filtered = suggestions.filter(s => !selectedCategories.includes(s.name));
+                
+                if (filtered.length === 0 && !selectedCategories.includes(query)) {
+                    container.innerHTML = `<div class="category-suggestion" onclick="addCategory('${query}')">Create "${query}"</div>`;
+                } else {
+                    container.innerHTML = filtered.map(s => `
+                        <div class="category-suggestion" onclick="addCategory('${s.name}')">${s.name}</div>
+                    `).join('');
+                    if (!selectedCategories.includes(query)) {
+                        container.innerHTML += `<div class="category-suggestion" onclick="addCategory('${query}')">Create "${query}"</div>`;
+                    }
+                }
+                container.style.display = 'block';
+            });
+    }
+    
+    document.getElementById('category-input').addEventListener('input', (e) => {
+        clearTimeout(categoryInputTimeout);
+        categoryInputTimeout = setTimeout(() => {
+            searchCategories(e.target.value);
+        }, 300);
+    });
+    
+    document.getElementById('category-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const value = e.target.value.trim();
+            if (value) {
+                addCategory(value);
+            }
+        }
+    });
+    
+    document.getElementById('item-image').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('item-image-preview').src = e.target.result;
+                document.getElementById('item-image-preview').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+    
+    function openCreateModal() {
+        document.getElementById('modal-title').textContent = 'Add Item';
+        document.getElementById('item-form').reset();
+        document.getElementById('item-id').value = '';
+        selectedCategories = [];
+        renderCategoryChips();
+        document.getElementById('item-image-preview').style.display = 'none';
+        const storeSel = document.getElementById('item-store');
+        if (storeSel) storeSel.value = '';
+        document.getElementById('item-modal').style.display = 'block';
+    }
+    
+    function editItem(id) {
+        const item = items.find(i => i.id === id);
+        document.getElementById('modal-title').textContent = 'Edit Item';
+        document.getElementById('item-id').value = item.id;
+        document.getElementById('item-name').value = item.name;
+        document.getElementById('item-quantity').value = item.quantity;
+        document.getElementById('item-unit').value = item.purchase_unit_type || '';
+        document.getElementById('item-full').value = item.full_amount;
+        document.getElementById('item-low').value = item.low_amount;
+        const pf = document.getElementById('item-purchase-freq');
+        if (pf) pf.value = item.purchase_frequency || '';
+        const lp = document.getElementById('item-last-purchase');
+        if (lp) lp.value = item.last_purchase_date || '';
+        const uf = document.getElementById('item-usage-freq');
+        if (uf) uf.value = item.usage_frequency || '';
+        const storeSel = document.getElementById('item-store');
+        if (storeSel) storeSel.value = item.store_id || '';
+        selectedCategories = parseCategoryNamesForDisplay(item.category_names);
+        renderCategoryChips();
+        
+        if (item.image) {
+            document.getElementById('item-image-preview').src = '/static/uploads/' + item.image;
+            document.getElementById('item-image-preview').style.display = 'block';
+        } else {
+            document.getElementById('item-image-preview').style.display = 'none';
+        }
+        
+        document.getElementById('item-modal').style.display = 'block';
+    }
+    
+    function deleteItem(id) {
+        if (!confirm('Are you sure you want to delete this item?')) return;
+        fetch(`/items/api/${id}`, { method: 'DELETE' })
+            .then(() => loadItems());
+    }
+    
+    function closeModal() {
+        document.getElementById('item-modal').style.display = 'none';
+    }
+    
+    document.getElementById('item-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = document.getElementById('item-id').value;
+        const formData = new FormData();
+        formData.append('name', document.getElementById('item-name').value);
+        formData.append('quantity', document.getElementById('item-quantity').value || 0);
+        formData.append('purchase_unit_type', document.getElementById('item-unit').value);
+        formData.append('full_amount', document.getElementById('item-full').value || 0);
+        formData.append('low_amount', document.getElementById('item-low').value || 0);
+        const pf = document.getElementById('item-purchase-freq');
+        if (pf) formData.append('purchase_frequency', pf.value);
+        const lp = document.getElementById('item-last-purchase');
+        if (lp) formData.append('last_purchase_date', lp.value || '');
+        const uf = document.getElementById('item-usage-freq');
+        if (uf) formData.append('usage_frequency', uf.value || '');
+        const storeSel = document.getElementById('item-store');
+        if (storeSel) formData.append('store_id', storeSel.value || '');
+        formData.append('categories', JSON.stringify(selectedCategories));
+        
+        const imageFile = document.getElementById('item-image').files[0];
+        if (imageFile) {
+            formData.append('image', imageFile);
+        }
+        
+        const url = id ? `/items/api/${id}` : '/items/api';
+        const method = id ? 'PUT' : 'POST';
+        
+        fetch(url, {
+            method,
+            body: formData
+        }).then(() => {
+            closeModal();
+            loadItems();
+        });
+    });
+    
+    // Close suggestions when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#category-picker-container')) {
+            document.getElementById('category-suggestions').style.display = 'none';
+        }
+    });
+    
+    loadStores();
+    loadCategories();
+    loadItems();
+</script>
+{% endblock %}

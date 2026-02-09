@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.env
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Local data and uploads (dev only; add-on uses /data)
+data/chores.db
+data/uploads/
+data/*.log
+*.db
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Secrets (do not commit)
+.env
+.env.local
+*.pem
+config/local*.json
+
+# Logs
+*.log
+startup.log
+
+# Optional: uncomment if you want to ignore backup zips
+# backup/*.zip

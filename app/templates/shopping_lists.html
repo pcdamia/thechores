@@ -1,0 +1,626 @@
+{% extends "base.html" %}
+
+{% block title %}Shopping Lists - The Chores{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h2 class="page-title">Shopping Lists</h2>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+            <input type="text" id="list-filter-search" class="form-input" placeholder="Search lists..." style="max-width: 200px;">
+            <select id="list-filter-store" class="form-input" style="max-width: 180px;">
+                <option value="">All stores</option>
+            </select>
+            <button class="btn btn-primary" onclick="openCreateModal()">Add Shopping List</button>
+        </div>
+    </div>
+    
+    <div class="cards-grid" id="shopping-lists-grid">
+        <!-- Active shopping lists will be loaded here -->
+    </div>
+    
+    <div style="margin-top: 48px;">
+        <h3 style="margin-bottom: 16px; color: var(--text-primary); font-size: 24px; font-weight: 600;">Completed Shopping Trips</h3>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <input type="text" id="completed-filter-search" class="form-input" placeholder="Search completed..." style="max-width: 200px;">
+            <select id="completed-filter-store" class="form-input" style="max-width: 180px;">
+                <option value="">All stores</option>
+            </select>
+        </div>
+        <div id="completed-lists-container">
+            <!-- Completed shopping lists grouped by date will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+<div id="shopping-list-modal" class="modal">
+    <div class="modal-content glass-card" style="max-height: 90vh; overflow-y: auto;">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h3 id="modal-title">Add Shopping List</h3>
+        <form id="shopping-list-form">
+            <input type="hidden" id="list-id">
+            <div class="form-group">
+                <label for="list-name">Name</label>
+                <input type="text" id="list-name" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="list-store">Store</label>
+                <select id="list-store" class="form-input">
+                    <option value="">No Store</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="list-budget">Budget ($)</label>
+                    <input type="number" id="list-budget" step="0.01" min="0" value="0" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="list-actual-spent">Actual Spent ($)</label>
+                    <input type="number" id="list-actual-spent" step="0.01" min="0" value="0" class="form-input">
+                </div>
+            </div>
+            <div id="budget-status" style="margin-bottom: 16px; padding: 12px; border-radius: 8px; display: none;">
+                <strong>Budget Status:</strong> <span id="budget-status-text"></span>
+            </div>
+            <div class="form-group">
+                <label>Items</label>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">Choose a store above, then pick from store items or type a new item name.</p>
+                <div id="list-items-container" style="margin-top: 12px;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; align-items: center;">
+                        <select id="list-item-dropdown" class="form-input" style="flex: 1; min-width: 160px;">
+                            <option value="">— Choose from store —</option>
+                        </select>
+                        <span style="color: var(--text-secondary);">or</span>
+                        <input type="text" id="new-item-name" class="form-input" placeholder="Type new item name" style="flex: 1; min-width: 140px;">
+                        <input type="number" id="new-item-quantity" step="0.01" min="0" value="1" class="form-input" placeholder="Qty" style="width: 70px;">
+                        <input type="text" id="new-item-unit" class="form-input" placeholder="Unit" style="width: 70px;">
+                        <button type="button" class="btn btn-secondary" onclick="addItemToList()">Add</button>
+                    </div>
+                    <div id="list-items-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto;">
+                        <!-- Items will be added here -->
+                    </div>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Login modal for guests saving a list -->
+<div id="shopping-login-modal" class="modal" style="display: none;">
+    <div class="modal-content glass-card" style="max-width: 400px;">
+        <span class="close" onclick="closeShoppingLoginModal()">&times;</span>
+        <h3>Log in to save</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">Enter your password to save this shopping list.</p>
+        <form id="shopping-login-form">
+            <div class="form-group">
+                <label for="shopping-login-username">Username</label>
+                <input type="text" id="shopping-login-username" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label for="shopping-login-password">Password</label>
+                <input type="password" id="shopping-login-password" class="form-input" required>
+            </div>
+            <div id="shopping-login-error" style="color: #ef4444; margin-bottom: 12px; display: none;"></div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeShoppingLoginModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Log in &amp; Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let shoppingLists = [];
+    let stores = [];
+    let listItems = [];
+    let storeItems = [];
+    let completedListsGrouped = {};
+    
+    function getFilteredLists() {
+        const search = (document.getElementById('list-filter-search')?.value || '').trim().toLowerCase();
+        const storeId = document.getElementById('list-filter-store')?.value || '';
+        return shoppingLists.filter(list => {
+            const matchSearch = !search || (list.name || '').toLowerCase().includes(search);
+            const matchStore = !storeId || String(list.store_id) === String(storeId);
+            return matchSearch && matchStore;
+        });
+    }
+    
+    function loadShoppingLists() {
+        fetch('/shopping-lists/api')
+            .then(r => r.json())
+            .then(data => {
+                shoppingLists = data;
+                renderLists();
+            })
+            .catch(err => {
+                console.error('Error loading shopping lists:', err);
+            });
+        loadCompletedShoppingLists();
+    }
+    
+    function loadCompletedShoppingLists() {
+        fetch('/shopping-lists/api/completed')
+            .then(r => r.json())
+            .then(data => {
+                completedListsGrouped = data || {};
+                renderCompletedShoppingLists();
+            })
+            .catch(err => {
+                console.error('Error loading completed shopping lists:', err);
+            });
+    }
+    
+    function renderCompletedShoppingLists() {
+        const container = document.getElementById('completed-lists-container');
+        const groupedData = completedListsGrouped;
+        if (!groupedData || Object.keys(groupedData).length === 0) {
+            container.innerHTML = '<p class="empty-state" style="color: var(--text-secondary);">No completed shopping trips yet.</p>';
+            return;
+        }
+        const search = (document.getElementById('completed-filter-search')?.value || '').trim().toLowerCase();
+        const storeId = document.getElementById('completed-filter-store')?.value || '';
+        const filterItem = (item) => {
+            const matchSearch = !search || (item.name || '').toLowerCase().includes(search);
+            const matchStore = !storeId || String(item.store_id) === String(storeId);
+            return matchSearch && matchStore;
+        };
+        const filteredGrouped = {};
+        Object.keys(groupedData).forEach(dateStr => {
+            const filtered = (groupedData[dateStr] || []).filter(filterItem);
+            if (filtered.length) filteredGrouped[dateStr] = filtered;
+        });
+        if (Object.keys(filteredGrouped).length === 0) {
+            container.innerHTML = '<p class="empty-state" style="color: var(--text-secondary);">No completed trips match the filter.</p>';
+            return;
+        }
+        const sortedDates = Object.keys(filteredGrouped).sort((a, b) => new Date(b) - new Date(a));
+        container.innerHTML = sortedDates.map(dateStr => {
+            const date = new Date(dateStr);
+            const dateFormatted = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            const items = filteredGrouped[dateStr];
+            
+            return `
+                <div style="margin-bottom: 32px;">
+                    <h4 style="margin-bottom: 16px; color: var(--text-primary); font-size: 18px; font-weight: 600; border-bottom: 2px solid var(--glass-border); padding-bottom: 8px;">
+                        ${dateFormatted}
+                    </h4>
+                    <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+                        ${items.map(item => {
+                            const budgetStatus = item.budget_status || 'spot_on';
+                            const budgetStatusColor = budgetStatus === 'over' ? '#ef4444' : budgetStatus === 'under' ? '#22c55e' : '#3b82f6';
+                            const budgetDiff = item.budget > 0 ? (item.actual_spent - item.budget).toFixed(2) : 0;
+                            
+                            return `
+                            <div class="glass-card" style="padding: 12px 16px; min-width: 200px; flex: 0 1 auto; opacity: 0.8;">
+                                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">${item.name}</div>
+                                ${item.store_name ? `<div style="font-size: 12px; color: var(--text-secondary);">${item.store_logo ? `<span class="store-chip"><img class="store-chip-logo" src="/static/uploads/${String(item.store_logo).replace(/^uploads\//, '')}" alt="" onerror="this.style.display='none'"><span>${item.store_name}</span></span>` : item.store_name}</div>` : ''}
+                                ${item.budget > 0 ? `
+                                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                                        Budget: $${item.budget.toFixed(2)} | Spent: $${item.actual_spent.toFixed(2)}
+                                    </div>
+                                    <div style="font-size: 12px; color: ${budgetStatusColor}; margin-top: 4px; font-weight: 600;">
+                                        ${budgetStatus === 'over' ? 'Over' : budgetStatus === 'under' ? 'Under' : 'On'} Budget
+                                        ${budgetDiff != 0 ? `(${budgetDiff > 0 ? '+' : ''}$${Math.abs(budgetDiff).toFixed(2)})` : ''}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    function loadStores() {
+        fetch('/stores/api')
+            .then(r => r.json())
+            .then(data => {
+                stores = data || [];
+                const storeSelect = document.getElementById('list-store');
+                if (storeSelect) {
+                    storeSelect.innerHTML = '<option value="">No Store</option>';
+                    stores.forEach(store => {
+                        const opt = document.createElement('option');
+                        opt.value = store.id;
+                        opt.textContent = store.name;
+                        storeSelect.appendChild(opt);
+                    });
+                }
+                ['list-filter-store', 'completed-filter-store'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.innerHTML = '<option value="">All stores</option>';
+                        stores.forEach(store => {
+                            const o = document.createElement('option');
+                            o.value = store.id;
+                            o.textContent = store.name;
+                            el.appendChild(o);
+                        });
+                    }
+                });
+            })
+            .catch(err => {
+                console.error('Error loading stores:', err);
+            });
+    }
+    
+    function loadItemsForStore(storeId) {
+        if (!storeId) { storeItems = []; updateListItemDropdown(); return; }
+        fetch('/items/api?store_id=' + encodeURIComponent(storeId))
+            .then(r => r.json())
+            .then(data => { storeItems = data || []; updateListItemDropdown(); })
+            .catch(() => { storeItems = []; updateListItemDropdown(); });
+    }
+    function updateListItemDropdown() {
+        const sel = document.getElementById('list-item-dropdown');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">— Choose from store —</option>';
+        storeItems.forEach(item => {
+            const opt = document.createElement('option');
+            opt.value = item.id;
+            opt.textContent = item.name;
+            opt.dataset.name = item.name;
+            sel.appendChild(opt);
+        });
+    }
+    document.getElementById('list-store').addEventListener('change', function() {
+        loadItemsForStore(this.value || null);
+    });
+    var listFilterSearch = document.getElementById('list-filter-search');
+    var listFilterStore = document.getElementById('list-filter-store');
+    if (listFilterSearch) listFilterSearch.addEventListener('input', renderLists);
+    if (listFilterStore) listFilterStore.addEventListener('change', renderLists);
+    var completedFilterSearch = document.getElementById('completed-filter-search');
+    var completedFilterStore = document.getElementById('completed-filter-store');
+    if (completedFilterSearch) completedFilterSearch.addEventListener('input', renderCompletedShoppingLists);
+    if (completedFilterStore) completedFilterStore.addEventListener('change', renderCompletedShoppingLists);
+    
+    function renderLists() {
+        const grid = document.getElementById('shopping-lists-grid');
+        const toShow = getFilteredLists();
+        if (toShow.length === 0) {
+            grid.innerHTML = '<p class="empty-state">No shopping lists match. Add one or change the filter.</p>';
+            return;
+        }
+        grid.innerHTML = toShow.map(list => {
+            const checkedCount = list.items.filter(i => i.checked).length;
+            const totalCount = list.items.length;
+            const budgetStatus = list.budget_status || 'spot_on';
+            const budgetStatusClass = budgetStatus === 'over' ? 'card-danger' : budgetStatus === 'under' ? 'card-success' : '';
+            const budgetStatusText = budgetStatus === 'over' ? 'Over Budget' : budgetStatus === 'under' ? 'Under Budget' : 'On Budget';
+            const budgetDiff = list.budget > 0 ? (list.actual_spent - list.budget).toFixed(2) : 0;
+            
+            return `
+                <div class="glass-card card ${budgetStatusClass}">
+                    <div class="card-header">
+                        <h3>${list.name}</h3>
+                    </div>
+                    <div class="card-body">
+                        ${list.store_name ? `<p><strong>Store:</strong> ${list.store_logo ? `<span class="store-chip"><img class="store-chip-logo" src="/static/uploads/${String(list.store_logo).replace(/^uploads\//, '')}" alt="" onerror="this.style.display='none'"><span>${list.store_name}</span></span>` : list.store_name}</p>` : '<p><strong>Store:</strong> No store selected</p>'}
+                        <div style="margin-bottom: 12px;">
+                            <p><strong>Budget:</strong> $${list.budget.toFixed(2)}</p>
+                            <p><strong>Actual Spent:</strong> $${list.actual_spent.toFixed(2)}</p>
+                            ${list.budget > 0 ? `
+                                <p><strong>Status:</strong> <span style="color: ${budgetStatus === 'over' ? '#ef4444' : budgetStatus === 'under' ? '#22c55e' : '#3b82f6'};">
+                                    ${budgetStatusText} ${budgetDiff != 0 ? `(${budgetDiff > 0 ? '+' : ''}$${Math.abs(budgetDiff).toFixed(2)})` : ''}
+                                </span></p>
+                            ` : ''}
+                        </div>
+                        <div style="margin-bottom: 12px;">
+                            <strong>Items:</strong> ${checkedCount}/${totalCount} checked
+                        </div>
+                        <div style="max-height: 200px; overflow-y: auto;">
+                            ${list.items.length > 0 ? list.items.map(item => `
+                                <div class="shopping-list-item ${item.checked ? 'checked' : ''}" style="display: flex; align-items: center; gap: 8px; padding: 6px; margin-bottom: 4px; border-radius: 6px; background: rgba(255,255,255,0.05);">
+                                    <input type="checkbox" ${item.checked ? 'checked' : ''} 
+                                           {% if not current_user.is_authenticated %}disabled{% endif %}
+                                           onchange="toggleItem(${item.id}, this.checked, ${list.id})">
+                                    <span>${item.name} ${item.quantity > 1 ? `(${item.quantity}${item.unit ? ' ' + item.unit : ''})` : ''}</span>
+                                </div>
+                            `).join('') : '<p style="color: var(--text-secondary); font-size: 14px;">No items yet</p>'}
+                        </div>
+                    </div>
+                    {% if current_user.is_authenticated %}
+                    <div class="card-actions card-actions-bottom">
+                        <button type="button" class="btn-round-icon" onclick="completeList(${list.id})" title="Mark as completed">✓</button>
+                        <button type="button" class="btn-round-icon" onclick="editList(${list.id})" title="Edit">✏️</button>
+                        <button type="button" class="btn-round-icon" onclick="deleteList(${list.id})" title="Delete">🗑️</button>
+                    </div>
+                    {% endif %}
+                </div>
+            `;
+        }).join('');
+    }
+    
+    function toggleItem(itemId, checked, listId) {
+        {% if current_user.is_authenticated %}
+        fetch(`/shopping-lists/api/items/${itemId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ checked: checked })
+        })
+        .then(r => r.json())
+        .then(() => {
+            loadShoppingLists();
+        })
+        .catch(err => {
+            console.error('Error updating item:', err);
+            alert('Failed to update item. Please try again.');
+        });
+        {% else %}
+        alert('Please log in to update items');
+        {% endif %}
+    }
+    
+    function addItemToList() {
+        const dropdown = document.getElementById('list-item-dropdown');
+        const nameInput = document.getElementById('new-item-name').value.trim();
+        const quantity = parseFloat(document.getElementById('new-item-quantity').value) || 1;
+        const unit = document.getElementById('new-item-unit').value.trim();
+        let name = nameInput;
+        let itemId = null;
+        if (dropdown && dropdown.value) {
+            itemId = parseInt(dropdown.value, 10);
+            name = dropdown.options[dropdown.selectedIndex].dataset.name || dropdown.options[dropdown.selectedIndex].textContent || name;
+        }
+        if (!name && !itemId) {
+            alert('Choose an item from the dropdown or type a new item name.');
+            return;
+        }
+        if (!name) name = 'Item';
+        listItems.push({ item_id: itemId, name: name, quantity: quantity, unit: unit, checked: false });
+        renderListItems();
+        document.getElementById('new-item-name').value = '';
+        document.getElementById('new-item-quantity').value = '1';
+        document.getElementById('new-item-unit').value = '';
+        if (dropdown) dropdown.value = '';
+    }
+    
+    function removeItemFromList(index) {
+        listItems.splice(index, 1);
+        renderListItems();
+    }
+    
+    function renderListItems() {
+        const container = document.getElementById('list-items-list');
+        container.innerHTML = listItems.map((item, index) => `
+            <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 6px;">
+                <span style="flex: 1;">${item.name}</span>
+                <span style="font-size: 12px; color: var(--text-secondary);">${item.quantity}${item.unit ? ' ' + item.unit : ''}</span>
+                <button type="button" class="btn-icon" onclick="removeItemFromList(${index})">🗑️</button>
+            </div>
+        `).join('');
+    }
+    
+    function updateBudgetStatus() {
+        const budget = parseFloat(document.getElementById('list-budget').value) || 0;
+        const actual = parseFloat(document.getElementById('list-actual-spent').value) || 0;
+        const statusDiv = document.getElementById('budget-status');
+        const statusText = document.getElementById('budget-status-text');
+        
+        if (budget > 0) {
+            statusDiv.style.display = 'block';
+            const diff = actual - budget;
+            if (diff > 0) {
+                statusDiv.style.background = 'rgba(239, 68, 68, 0.2)';
+                statusDiv.style.border = '1px solid rgba(239, 68, 68, 0.5)';
+                statusText.textContent = `Over Budget by $${diff.toFixed(2)}`;
+                statusText.style.color = '#ef4444';
+            } else if (diff < 0) {
+                statusDiv.style.background = 'rgba(34, 197, 94, 0.2)';
+                statusDiv.style.border = '1px solid rgba(34, 197, 94, 0.5)';
+                statusText.textContent = `Under Budget by $${Math.abs(diff).toFixed(2)}`;
+                statusText.style.color = '#22c55e';
+            } else {
+                statusDiv.style.background = 'rgba(59, 130, 246, 0.2)';
+                statusDiv.style.border = '1px solid rgba(59, 130, 246, 0.5)';
+                statusText.textContent = 'On Budget';
+                statusText.style.color = '#3b82f6';
+            }
+        } else {
+            statusDiv.style.display = 'none';
+        }
+    }
+    
+    function openCreateModal() {
+        document.getElementById('modal-title').textContent = 'Add Shopping List';
+        document.getElementById('shopping-list-form').reset();
+        document.getElementById('list-id').value = '';
+        listItems = [];
+        storeItems = [];
+        updateListItemDropdown();
+        renderListItems();
+        document.getElementById('list-budget').value = '0';
+        document.getElementById('list-actual-spent').value = '0';
+        document.getElementById('budget-status').style.display = 'none';
+        document.getElementById('shopping-list-modal').style.display = 'block';
+        document.body.classList.add('modal-open');
+    }
+    
+    function editList(id) {
+        {% if current_user.is_authenticated %}
+        const list = shoppingLists.find(l => l.id === id);
+        if (!list) return;
+        
+        document.getElementById('modal-title').textContent = 'Edit Shopping List';
+        document.getElementById('list-id').value = list.id;
+        document.getElementById('list-name').value = list.name;
+        document.getElementById('list-store').value = list.store_id || '';
+        document.getElementById('list-budget').value = list.budget || 0;
+        document.getElementById('list-actual-spent').value = list.actual_spent || 0;
+        
+        listItems = list.items.map(item => ({
+            item_id: item.item_id || null,
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit || '',
+            checked: item.checked
+        }));
+        renderListItems();
+        updateBudgetStatus();
+        loadItemsForStore(list.store_id || null);
+        document.getElementById('shopping-list-modal').style.display = 'block';
+        document.body.classList.add('modal-open');
+        {% else %}
+        alert('Please log in to edit lists');
+        {% endif %}
+    }
+    
+    function completeList(id) {
+        {% if current_user.is_authenticated %}
+        if (!confirm('Mark this shopping list as completed?')) return;
+        fetch(`/shopping-lists/api/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ completed: true })
+        })
+        .then(() => {
+            loadShoppingLists();
+        })
+        .catch(err => {
+            console.error('Error completing list:', err);
+            alert('Failed to mark list as completed. Please try again.');
+        });
+        {% else %}
+        alert('Please log in to complete lists');
+        {% endif %}
+    }
+    
+    function deleteList(id) {
+        {% if current_user.is_authenticated %}
+        if (!confirm('Are you sure you want to delete this shopping list?')) return;
+        fetch(`/shopping-lists/api/${id}`, { method: 'DELETE' })
+            .then(() => loadShoppingLists());
+        {% else %}
+        alert('Please log in to delete lists');
+        {% endif %}
+    }
+    
+    function closeModal() {
+        document.getElementById('shopping-list-modal').style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }
+    
+    document.getElementById('list-budget').addEventListener('input', updateBudgetStatus);
+    document.getElementById('list-actual-spent').addEventListener('input', updateBudgetStatus);
+    
+    function doSaveList(id, data, isEdit, items, onDone) {
+        const url = id ? `/shopping-lists/api/${id}` : '/shopping-lists/api';
+        const method = id ? 'PUT' : 'POST';
+        fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+            credentials: 'same-origin'
+        })
+        .then(r => r.json())
+        .then(listData => {
+            const listId = listData.id;
+            const replaceItems = () => {
+                if (!items || items.length === 0) {
+                    closeModal();
+                    if (onDone) onDone();
+                    loadShoppingLists();
+                    return Promise.resolve();
+                }
+                const itemPromises = items.map(item =>
+                    fetch(`/shopping-lists/api/${listId}/items`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            item_id: item.item_id || null,
+                            name: item.name,
+                            quantity: item.quantity,
+                            unit: item.unit || null
+                        }),
+                        credentials: 'same-origin'
+                    })
+                );
+                return Promise.all(itemPromises).then(() => {
+                    closeModal();
+                    if (onDone) onDone();
+                    loadShoppingLists();
+                });
+            };
+            if (isEdit) {
+                return fetch(`/shopping-lists/api/${listId}/items`, { method: 'DELETE', credentials: 'same-origin' })
+                    .then(() => replaceItems());
+            }
+            return replaceItems();
+        })
+        .catch(err => {
+            console.error('Error saving list:', err);
+            alert('Failed to save shopping list. Please try again.');
+        });
+    }
+    
+    {% if not current_user.is_authenticated %}
+    let pendingListSave = null;
+    function closeShoppingLoginModal() {
+        document.getElementById('shopping-login-modal').style.display = 'none';
+        document.getElementById('shopping-login-error').style.display = 'none';
+    }
+    document.getElementById('shopping-login-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const username = document.getElementById('shopping-login-username').value;
+        const password = document.getElementById('shopping-login-password').value;
+        const errEl = document.getElementById('shopping-login-error');
+        fetch('/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+            body: 'username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password),
+            credentials: 'same-origin'
+        })
+        .then(r => r.json().then(data => ({ ok: r.ok, data: data || {} })))
+        .then(({ ok, data }) => {
+            if (!ok) throw new Error(data.error || 'Login failed');
+            if (!pendingListSave) return;
+            const { id, data: listData, isEdit, items } = pendingListSave;
+            pendingListSave = null;
+            closeShoppingLoginModal();
+            doSaveList(id, listData, isEdit, items, () => { window.location.reload(); });
+        })
+        .catch(err => {
+            errEl.textContent = err.message || 'Invalid username or password.';
+            errEl.style.display = 'block';
+        });
+    });
+    {% endif %}
+    
+    document.getElementById('shopping-list-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = document.getElementById('list-id').value;
+        const data = {
+            name: document.getElementById('list-name').value,
+            store_id: document.getElementById('list-store').value || null,
+            budget: parseFloat(document.getElementById('list-budget').value) || 0,
+            actual_spent: parseFloat(document.getElementById('list-actual-spent').value) || 0
+        };
+        const isEdit = !!id;
+        const items = listItems.map(i => ({ name: i.name, quantity: i.quantity, unit: i.unit || null }));
+        {% if not current_user.is_authenticated %}
+        if (isEdit) {
+            alert('Please log in to edit existing lists.');
+            return;
+        }
+        pendingListSave = { id: null, data, isEdit: false, items };
+        document.getElementById('shopping-login-username').value = '';
+        document.getElementById('shopping-login-password').value = '';
+        document.getElementById('shopping-login-error').style.display = 'none';
+        document.getElementById('shopping-login-modal').style.display = 'block';
+        return;
+        {% endif %}
+        doSaveList(id, data, isEdit, items);
+    });
+    
+    loadStores();
+    loadShoppingLists();
+</script>
+{% endblock %}

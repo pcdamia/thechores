@@ -1,0 +1,1224 @@
+{% extends "base.html" %}
+
+{% block title %}Stores - The Chores{% endblock %}
+
+{% block content %}
+<div class="page-container" id="stores-page-container" data-is-admin="{{ 'true' if current_user.is_admin else 'false' }}">
+    <section id="lists-section" class="lists-section">
+        <div class="page-header" style="margin-bottom: 16px;">
+            <h2 class="page-title">Shopping Lists</h2>
+            <div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
+                <input type="text" id="list-filter-search" class="form-input" placeholder="Search all lists..." style="max-width: 200px; flex-shrink: 0;">
+                <button type="button" class="btn btn-primary" onclick="openListModal()" style="white-space: nowrap;">Add Shopping List</button>
+            </div>
+        </div>
+        <div class="cards-grid" id="shopping-lists-grid">
+            <!-- Active shopping lists -->
+        </div>
+        <div style="margin-top: 32px;">
+            <h3 style="margin-bottom: 16px; color: var(--text-primary); font-size: 20px; font-weight: 600;">Completed Shopping Trips</h3>
+            <div id="completed-lists-container"></div>
+        </div>
+    </section>
+
+    <div class="page-header" style="margin-top: 48px;">
+        <h2 class="page-title">Stores</h2>
+        <div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
+            <input type="text" id="store-filter-search" class="form-input" placeholder="Search stores..." style="max-width: 200px; flex-shrink: 0;">
+            <button class="btn btn-primary" onclick="openCreateModal()" style="white-space: nowrap;">Add Store</button>
+        </div>
+    </div>
+    
+    <div class="cards-grid mosaic" id="stores-grid">
+        <!-- Stores will be loaded here -->
+    </div>
+
+    <section id="items-section" class="items-section">
+        <div class="page-header" style="margin-top: 48px; margin-bottom: 16px;">
+            <h2 class="page-title">Items</h2>
+            <div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
+                <input type="text" id="item-filter-search" class="form-input" placeholder="Search items..." style="max-width: 200px; flex-shrink: 0;">
+                <button class="btn btn-primary" onclick="openCreateItemModal()" style="white-space: nowrap;">Add Item</button>
+            </div>
+        </div>
+        <div class="cards-grid mosaic" id="items-grid">
+            <!-- Items will be loaded here -->
+        </div>
+    </section>
+</div>
+
+<!-- Store items full list modal -->
+<div id="store-items-modal" class="modal">
+    <div class="modal-content glass-card" style="max-width: 400px; max-height: 80vh;">
+        <span class="close" onclick="closeStoreItemsModal()">&times;</span>
+        <h3 id="store-items-modal-title">Store items</h3>
+        <ul id="store-items-modal-list" style="list-style: none; padding: 0; margin: 0; overflow-y: auto;"></ul>
+    </div>
+</div>
+
+<!-- Create/Edit Store Modal -->
+<div id="store-modal" class="modal">
+    <div class="modal-content glass-card">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h3 id="modal-title">Add Store</h3>
+        <form id="store-form" enctype="multipart/form-data">
+            <input type="hidden" id="store-id">
+            <div class="form-group">
+                <label for="store-name">Name</label>
+                <input type="text" id="store-name" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label>Store Image</label>
+                <div style="margin-bottom: 16px;">
+                    <img id="store-image-preview" src="" alt="Store" style="width: 150px; height: 150px; border-radius: 8px; object-fit: cover; border: 2px solid var(--glass-border); display: none; margin-bottom: 8px;">
+                    <input type="file" id="store-image" accept="image/*" style="display: none;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('store-image').click()">Choose Image</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Store logo (small icon for chips)</label>
+                <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 12px;">
+                    <img id="store-logo-preview" src="" alt="Logo" style="width: 48px; height: 48px; border-radius: 8px; object-fit: contain; border: 2px solid var(--glass-border); display: none; background: rgba(255,255,255,0.1);">
+                    <input type="file" id="store-logo" accept="image/*" style="display: none;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('store-logo').click()">Choose logo</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="store-color">Card color</label>
+                <input type="text" id="store-color" class="form-input" placeholder="e.g. #4ade80 or leave blank" maxlength="20">
+            </div>
+            <div class="form-group">
+                <label for="store-categories-text">Categories</label>
+                <input type="text" id="store-categories-text" class="form-input" placeholder="Type a category, then comma for next (e.g. Produce 🥬, Dairy 🧀)">
+                <div id="store-category-chips" class="store-category-chips" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; min-height: 24px;"></div>
+            </div>
+            <div class="form-group">
+                <label for="store-budget">Budget (tokens)</label>
+                <input type="number" id="store-budget" step="0.01" class="form-input" placeholder="e.g. 200">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Create/Edit Item Modal -->
+<div id="item-modal" class="modal">
+    <div class="modal-content glass-card" style="max-height: 90vh; overflow-y: auto;">
+        <span class="close" onclick="closeItemModal()">&times;</span>
+        <h3 id="item-modal-title">Add Item</h3>
+        <form id="item-form" enctype="multipart/form-data">
+            <input type="hidden" id="item-id">
+            <div class="form-group">
+                <label for="item-name">Name</label>
+                <input type="text" id="item-name" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label>Item Image</label>
+                <div style="margin-bottom: 16px;">
+                    <img id="item-image-preview" src="" alt="Item" style="width: 150px; height: 150px; border-radius: 8px; object-fit: cover; border: 2px solid var(--glass-border); display: none; margin-bottom: 8px;">
+                    <input type="file" id="item-image" accept="image/*" style="display: none;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('item-image').click()">Choose Image</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Stores (optional, pick multiple)</label>
+                <div id="item-stores-list" class="item-stores-list" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">
+                    <!-- Store checkboxes populated by JS -->
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Categories (up to 5)</label>
+                <div id="category-picker-container">
+                    <div style="position: relative;">
+                        <input type="text" id="category-input" class="form-input" placeholder="Type to search or add category" autocomplete="off">
+                        <div id="category-suggestions" class="category-suggestions" style="display: none;"></div>
+                    </div>
+                    <div id="category-chips" class="category-chips" style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px;"></div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="item-quantity">Quantity</label>
+                    <input type="number" id="item-quantity" step="0.01" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="item-unit">Unit Type</label>
+                    <input type="text" id="item-unit" class="form-input" placeholder="e.g., lbs, oz, count">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="item-full">Full Amount</label>
+                    <input type="number" id="item-full" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="item-low">Low Amount</label>
+                    <input type="number" id="item-low" class="form-input">
+                </div>
+            </div>
+            <div class="form-group item-admin-only" style="display: none;">
+                <label for="item-purchase-freq">Purchase Frequency</label>
+                <input type="text" id="item-purchase-freq" class="form-input" placeholder="e.g., weekly, monthly">
+            </div>
+            <div class="form-group item-admin-only" style="display: none;">
+                <label for="item-last-purchase">Last Purchase Date</label>
+                <input type="date" id="item-last-purchase" class="form-input">
+            </div>
+            <div class="form-group item-admin-only" style="display: none;">
+                <label for="item-usage-freq">Usage Frequency (optional)</label>
+                <input type="text" id="item-usage-freq" class="form-input">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-secondary" onclick="closeItemModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Create/Edit Shopping List Modal -->
+<div id="shopping-list-modal" class="modal">
+    <div class="modal-content glass-card" style="max-height: 90vh; overflow-y: auto;">
+        <span class="close" onclick="closeListModal()">&times;</span>
+        <h3 id="list-modal-title">Add Shopping List</h3>
+        <form id="shopping-list-form">
+            <input type="hidden" id="list-id">
+            <div class="form-group">
+                <label for="list-name">Name</label>
+                <input type="text" id="list-name" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="list-store">Store</label>
+                <select id="list-store" class="form-input">
+                    <option value="">No Store</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="list-budget">Budget ($)</label>
+                    <input type="number" id="list-budget" step="0.01" min="0" value="0" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="list-actual-spent">Actual Spent ($)</label>
+                    <input type="number" id="list-actual-spent" step="0.01" min="0" value="0" class="form-input">
+                </div>
+            </div>
+            <div id="budget-status" style="margin-bottom: 16px; padding: 12px; border-radius: 8px; display: none;"><strong>Budget Status:</strong> <span id="budget-status-text"></span></div>
+            <div class="form-group">
+                <label>Items</label>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">Choose a store above, then pick from store items or type a new item name.</p>
+                <div style="margin-top: 12px;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; align-items: center;">
+                        <select id="list-item-dropdown" class="form-input" style="flex: 1; min-width: 160px;"><option value="">— Choose from store —</option></select>
+                        <span style="color: var(--text-secondary);">or</span>
+                        <input type="text" id="new-item-name" class="form-input" placeholder="Type new item name" style="flex: 1; min-width: 140px;">
+                        <input type="number" id="new-item-quantity" step="0.01" min="0" value="1" class="form-input" placeholder="Qty" style="width: 70px;">
+                        <input type="text" id="new-item-unit" class="form-input" placeholder="Unit" style="width: 70px;">
+                        <button type="button" class="btn btn-secondary" onclick="addItemToList()">Add</button>
+                    </div>
+                    <div id="list-items-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto;"></div>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-secondary" onclick="closeListModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.store-category-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.store-category-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border-radius: 16px;
+    background: rgba(255,255,255,0.2); color: var(--text-primary);
+    font-size: 14px;
+}
+.store-category-chip-remove { cursor: pointer; font-weight: bold; opacity: 0.8; }
+.store-category-chip-remove:hover { opacity: 1; }
+
+/* Store card: chips and layout */
+.store-card { position: relative; overflow: hidden; display: flex; flex-direction: column; }
+.store-card.glass-card { padding: 2px; }
+.store-card-bg {
+    position: absolute; inset: 0; z-index: 0;
+    background-size: cover; background-position: center;
+    filter: blur(4px); opacity: 0.35;
+    transform: scale(1.08);
+}
+.store-card-content { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; }
+.store-card-content .card-body { flex: 1; padding: 16px 20px; }
+.store-card .store-items-section { padding: 12px 0 4px; margin-top: 16px; border-top: 1px solid var(--glass-border); }
+.store-card-categories { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.store-card-chip {
+    display: inline-block;
+    padding: 4px 8px; border-radius: 12px;
+    background: rgba(255,255,255,0.25); color: var(--text-primary);
+    font-size: 8px;
+}
+.store-card .store-card-content { color: #fff; }
+.store-card .store-card-content .store-card-chip { color: rgba(255,255,255,0.95); }
+.store-card .store-card-content .card-body p,
+.store-card .store-card-content .card-body strong,
+.store-card .store-card-content .store-items-section,
+.store-card .store-card-content .store-items-section strong,
+.store-card .store-card-content .store-items-list,
+.store-card .store-card-content .store-items-list li { color: rgba(255,255,255,0.95); }
+.store-card .store-card-content .card-header h3 { color: #fff !important; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.store-card .card-actions-bottom { margin-top: auto; justify-content: space-between; }
+.store-card.store-card-has-image.glass-card { background: transparent; }
+.store-card.store-card-has-image .store-card-content { border-radius: inherit; padding: 10px; }
+
+/* Store chip: small logo + name (used on cards and in items/lists) */
+.store-chip { display: inline-flex; align-items: center; gap: 8px; }
+.store-chip-logo { width: 24px; height: 24px; border-radius: 6px; object-fit: contain; flex-shrink: 0; }
+
+/* Items section: uniform with store cards */
+.items-section .item-card { display: flex; flex-direction: column; }
+.items-section .item-card .card-body { flex: 1; padding: 16px 20px; }
+.items-section .item-card .card-actions-bottom { margin-top: auto; justify-content: space-between; }
+.items-section .item-card-chip { display: inline-block; padding: 4px 8px; border-radius: 12px; background: rgba(255,255,255,0.25); font-size: 8px; margin: 2px 4px 2px 0; }
+.category-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.category-chip { background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 16px; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+.category-chip-remove { cursor: pointer; font-weight: bold; }
+.category-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: var(--glass-bg); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); border-radius: 8px; margin-top: 4px; max-height: 200px; overflow-y: auto; z-index: 1000; }
+.category-suggestion { padding: 12px; cursor: pointer; border-bottom: 1px solid var(--glass-border); }
+.category-suggestion:hover { background: rgba(255,255,255,0.1); }
+.category-suggestion:last-child { border-bottom: none; }
+</style>
+
+<script>
+    const IS_ADMIN = document.getElementById('stores-page-container')?.dataset?.isAdmin === 'true';
+    let stores = [];
+    let items = [];
+    let storeCategoryChips = [];
+    let selectedCategories = [];
+    let selectedStoreIds = [];
+    let allCategories = [];
+    let categoryInputTimeout;
+    let shoppingLists = [];
+    let listItems = [];
+    let storeItems = [];
+    let completedListsGrouped = {};
+    window.shoppingLists = shoppingLists;
+    
+    document.querySelectorAll('.item-admin-only').forEach(el => { el.style.display = IS_ADMIN ? 'block' : 'none'; });
+    
+    function loadStores() {
+        fetch('/stores/api')
+            .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+            .then(data => {
+                stores = Array.isArray(data) ? data : [];
+                renderItemStoresCheckboxes();
+                populateListStoreDropdowns();
+                loadItems();
+                loadShoppingLists();
+            })
+            .catch(() => {
+                stores = [];
+                renderItemStoresCheckboxes();
+                loadItems();
+            });
+    }
+    function populateListStoreDropdowns() {
+        ['list-store'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const isListStore = id === 'list-store';
+            el.innerHTML = isListStore ? '<option value="">No Store</option>' : '<option value="">All stores</option>';
+            stores.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = s.name;
+                el.appendChild(opt);
+            });
+        });
+    }
+    
+    function loadItems() {
+        fetch('/items/api')
+            .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+            .then(data => {
+                items = Array.isArray(data) ? data : [];
+                renderStores();
+                renderItems();
+            })
+            .catch(() => {
+                items = [];
+                renderStores();
+                renderItems();
+            });
+    }
+    
+    function renderItemStoresCheckboxes() {
+        const container = document.getElementById('item-stores-list');
+        if (!container) return;
+        container.innerHTML = (stores || []).map(s => `
+            <label class="store-checkbox-label" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.1);">
+                <input type="checkbox" class="item-store-cb" value="${s.id}" ${selectedStoreIds.includes(s.id) ? 'checked' : ''}>
+                <span>${escapeHtml(s.name)}</span>
+            </label>
+        `).join('');
+        container.querySelectorAll('.item-store-cb').forEach(cb => {
+            cb.addEventListener('change', () => {
+                const id = parseInt(cb.value, 10);
+                if (cb.checked) {
+                    if (!selectedStoreIds.includes(id)) selectedStoreIds.push(id);
+                } else {
+                    selectedStoreIds = selectedStoreIds.filter(x => x !== id);
+                }
+            });
+        });
+    }
+    
+    function itemsForStore(storeId) {
+        if (storeId == null || storeId === '') return [];
+        const sid = Number(storeId);
+        return items.filter(i => (i.store_ids && i.store_ids.includes(sid)) || Number(i.store_id) === sid);
+    }
+    
+    function parseCategoryValue(v) {
+        if (v == null) return '';
+        let s = String(v).trim();
+        if (!s) return '';
+        if (s.startsWith('[')) {
+            try {
+                const unescaped = s.replace(/\\"/g, '"');
+                const parsed = JSON.parse(unescaped);
+                if (Array.isArray(parsed)) return parsed.map(x => (x != null ? String(x).trim() : '')).filter(Boolean).join(', ');
+            } catch (_) {}
+            const matches = s.match(/"([^"\\]*(?:\\.[^"\\]*)*)"/g);
+            if (matches) return matches.map(m => m.replace(/^"|"$/g, '').replace(/\\"/g, '"').trim()).filter(Boolean).join(', ');
+            return s.replace(/^\[|\]$/g, '').replace(/"/g, '').replace(/\\/g, '').trim();
+        }
+        return s.replace(/^\[?"?|"?\]?$/g, '').replace(/\\"/g, '"').trim();
+    }
+    function formatCategoriesDisplay(store) {
+        if (store.categories_text && String(store.categories_text).trim()) return String(store.categories_text).trim();
+        const raw = store.category_names;
+        if (raw == null) return '';
+        let out = '';
+        if (Array.isArray(raw)) {
+            const parts = raw.map(c => parseCategoryValue(c)).filter(Boolean);
+            out = parts.join(', ');
+        } else {
+            out = parseCategoryValue(raw);
+        }
+        if (out && out.startsWith('[')) out = parseCategoryValue(out);
+        return out;
+    }
+    function categoriesArrayForCard(store) {
+        const s = formatCategoriesDisplay(store);
+        if (!s) return [];
+        return s.split(',').map(x => x.trim()).filter(Boolean);
+    }
+    function parseCategoryNamesForDisplay(val) {
+        if (val == null) return [];
+        if (Array.isArray(val)) return val.map(x => (x != null ? String(x).trim() : '')).filter(Boolean);
+        const s = String(val).trim();
+        if (!s) return [];
+        if (s.startsWith('[')) {
+            try {
+                const parsed = JSON.parse(s);
+                if (Array.isArray(parsed)) return parsed.map(x => (x != null ? String(x).trim() : '')).filter(Boolean);
+                return [String(parsed).trim()].filter(Boolean);
+            } catch (_) {}
+        }
+        return s.split(',').map(x => x.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+    }
+    
+    const UPLOADS_PREFIX = /^uploads\//;
+    function renderStores() {
+        const grid = document.getElementById('stores-grid');
+        const search = (document.getElementById('store-filter-search')?.value || '').trim().toLowerCase();
+        const filteredStores = stores.filter(store => {
+            const matchSearch = !search || (store.name || '').toLowerCase().includes(search);
+            return matchSearch;
+        });
+        if (filteredStores.length === 0) {
+            grid.innerHTML = '<p class="empty-state">No stores match your search. Add one or change the filter.</p>';
+            return;
+        }
+        grid.innerHTML = filteredStores.map(store => {
+            const storeItems = itemsForStore(store.id);
+            const categoryChips = categoriesArrayForCard(store);
+            const colorStyle = store.color_code ? `border-left: 4px solid ${store.color_code};` : '';
+            const storeImagePath = store.image ? String(store.image).replace(UPLOADS_PREFIX, '') : '';
+            const storeLogoPath = store.logo ? String(store.logo).replace(UPLOADS_PREFIX, '') : '';
+            const bgStyle = store.image ? `background-image: url('/static/uploads/${storeImagePath}');` : '';
+            const hex = store.color_code ? (String(store.color_code).startsWith('#') ? store.color_code : '#' + String(store.color_code)) : null;
+            const overlayStyle = store.image
+                ? (hex
+                    ? `background: linear-gradient(135deg, ${hex}E6 0%, ${hex}99 50%, transparent 100%);`
+                    : 'background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, transparent 100%);')
+                : '';
+            const contentStyle = overlayStyle ? overlayStyle + ' border-radius: inherit; padding: 10px;' : '';
+            const chipsHtml = categoryChips.length ? `<div class="store-card-categories">${categoryChips.map(c => `<span class="store-card-chip">${escapeHtml(c)}</span>`).join('')}</div>` : '';
+            const storeNameHtml = store.logo
+                ? `<span class="store-chip"><img class="store-chip-logo" src="/static/uploads/${storeLogoPath}" alt="" onerror="this.style.display='none'"><span>${escapeHtml(store.name)}</span></span>`
+                : escapeHtml(store.name);
+            const maxItems = 5;
+            const displayItems = storeItems.slice(0, maxItems);
+            const hasMore = storeItems.length > maxItems;
+            const listOptions = (window.shoppingLists || []).map(l => `<option value="${l.id}">${escapeHtml(l.name)}</option>`).join('');
+            const itemsListHtml = storeItems.length
+                ? `<ul class="store-items-list" style="margin: 8px 0 0 0; padding-left: 20px; list-style: none; padding-left: 0;">${displayItems.map(i => `
+                    <li class="store-item-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
+                        <span>${escapeHtml(i.name)}${i.is_low ? ' <span style="color: var(--accent);">(low)</span>' : ''}</span>
+                        <span class="store-item-actions" style="display: flex; align-items: center; gap: 4px;">
+                            <select class="add-to-list-select form-input" style="font-size: 12px; padding: 4px 8px; min-width: 100px;" data-item-id="${i.id}" data-item-name="${escapeHtml(i.name)}" onchange="onAddItemToListSelect(this)">
+                                <option value="">Add to list...</option>${listOptions}
+                            </select>
+                            <span class="add-to-list-msg" style="font-size: 11px; color: #22c55e; display: none;"></span>
+                        </span>
+                    </li>`).join('')}${hasMore ? `<li style="margin-top: 8px;"><button type="button" class="btn btn-secondary" style="font-size: 12px; padding: 4px 10px;" onclick="openStoreItemsModal(${store.id}, ${storeItems.length})">… See full list (${storeItems.length})</button></li>` : ''}</ul>`
+                : '<p style="margin: 8px 0 0 0; font-size: 14px;">No items linked</p>';
+            return `
+            <div class="glass-card card store-card store-mosaic-card ${store.image ? 'store-card-has-image' : ''}" data-store-id="${store.id}" style="${colorStyle}">
+                ${store.image ? `<div class="store-card-bg" style="${bgStyle}" aria-hidden="true"></div>` : ''}
+                <div class="store-card-content" style="${contentStyle}">
+                    <div class="card-header">
+                        <h3>${storeNameHtml}</h3>
+                    </div>
+                    ${store.image ? `<img src="/static/uploads/${storeImagePath}" alt="${escapeHtml(store.name)}" style="width: 100%; height: 160px; object-fit: cover; border-radius: 8px; margin-bottom: 12px;" onerror="this.onerror=null;this.style.display='none'">` : ''}
+                    <div class="card-body">
+                        ${chipsHtml}
+                        <p><strong>Budget:</strong> ${Number(store.budget).toFixed(2)} tokens</p>
+                        <div class="store-items-section store-items-list-wrap">
+                            <strong>Items (${storeItems.length})</strong>
+                            ${itemsListHtml}
+                        </div>
+                    </div>
+                    <div class="card-actions-bottom">
+                        <button onclick="editStore(${store.id})" class="btn-icon" title="Edit">✏️</button>
+                        <button onclick="deleteStore(${store.id})" class="btn-icon" title="Delete">🗑️</button>
+                    </div>
+                </div>
+            </div>
+            `;
+        }).join('');
+    }
+    
+    function escapeHtml(s) {
+        if (s == null) return '';
+        const div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
+    
+    function renderItems() {
+        const grid = document.getElementById('items-grid');
+        if (!grid) return;
+        const search = (document.getElementById('item-filter-search')?.value || '').trim().toLowerCase();
+        const filteredItems = items.filter(item => {
+            const matchSearch = !search || (item.name || '').toLowerCase().includes(search);
+            return matchSearch;
+        });
+        if (filteredItems.length === 0) {
+            grid.innerHTML = '<p class="empty-state">No items match your search. Add one or change the filter.</p>';
+            return;
+        }
+        grid.innerHTML = filteredItems.map(item => {
+            const qty = Number(item.quantity) || 0;
+            const low = Number(item.low_amount) || 0;
+            const full = Number(item.full_amount) || low || 1;
+            const pct = full > 0 ? Math.min(100, (qty / full) * 100) : (qty > 0 ? 100 : 0);
+            let statusClass = 'item-status-in-stock';
+            let statusText = 'In Stock';
+            if (qty <= 0) {
+                statusClass = 'item-status-out';
+                statusText = 'Out of Stock';
+            } else if (item.is_low) {
+                statusClass = 'item-status-low';
+                statusText = 'Low Stock';
+            }
+            const storeIds = item.store_ids || (item.store_id != null ? [item.store_id] : []);
+            const storeNames = item.store_names || (item.store_name ? [item.store_name] : []);
+            const storeLogos = item.store_logos || (item.store_logo != null ? [item.store_logo] : []);
+            const storeChips = storeIds.map((sid, i) => {
+                const name = storeNames[i] != null ? storeNames[i] : (stores.find(s => s.id === sid) || {}).name || '';
+                const logo = storeLogos[i];
+                const logoUrl = logo ? '/static/uploads/' + String(logo).replace(UPLOADS_PREFIX, '') : '';
+                return logoUrl
+                    ? `<span class="store-chip"><img class="store-chip-logo" src="${logoUrl}" alt="" onerror="this.style.display='none'"><span>${escapeHtml(name)}</span></span>`
+                    : `<span class="store-chip">${escapeHtml(name)}</span>`;
+            }).join(' ');
+            const barColor = qty <= 0 ? '#ef4444' : item.is_low ? '#f59e0b' : '#22c55e';
+            const itemImagePath = item.image ? String(item.image).replace(UPLOADS_PREFIX, '') : '';
+            return `
+            <div class="glass-card card item-mosaic-card" data-item-id="${item.id}">
+                <span class="item-status-pill ${statusClass}">${statusText}</span>
+                <div class="item-image-wrap">
+                    ${item.image ? `<img src="/static/uploads/${itemImagePath}" alt="${escapeHtml(item.name)}" onerror="this.style.display='none'">` : '<span style="color: var(--text-secondary); font-size: 14px;">No image</span>'}
+                </div>
+                <h3 style="margin: 0 0 8px 0; font-size: 16px;">${escapeHtml(item.name)}</h3>
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text-secondary);">
+                    <span style="color: ${barColor};">↑</span>
+                    <span>${qty} in stock</span>
+                </div>
+                <div class="item-qty-bar">
+                    <div class="item-qty-bar-fill" style="width: ${pct}%; background: ${barColor};"></div>
+                </div>
+                ${storeChips ? `<div style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px;">${storeChips}</div>` : ''}
+                <div class="card-actions" style="margin-top: auto; padding-top: 12px; justify-content: space-evenly; border-top: 1px solid var(--glass-border);">
+                    <button onclick="editItem(${item.id})" class="btn-icon" title="Edit">✏️</button>
+                    <button onclick="deleteItem(${item.id})" class="btn-icon" title="Delete">🗑️</button>
+                </div>
+            </div>
+            `;
+        }).join('');
+    }
+    
+    function renderStoreCategoryChips() {
+        const container = document.getElementById('store-category-chips');
+        if (!container) return;
+        container.innerHTML = storeCategoryChips.map((cat, idx) =>
+            `<span class="store-category-chip">${escapeHtml(cat)}<span class="store-category-chip-remove" data-idx="${idx}" title="Remove">×</span></span>`
+        ).join('');
+        container.querySelectorAll('.store-category-chip-remove').forEach(el => {
+            el.addEventListener('click', () => {
+                storeCategoryChips.splice(parseInt(el.dataset.idx, 10), 1);
+                renderStoreCategoryChips();
+            });
+        });
+    }
+    
+    document.getElementById('store-categories-text').addEventListener('input', (e) => {
+        const val = e.target.value;
+        const commaIdx = val.indexOf(',');
+        if (commaIdx !== -1) {
+            const before = val.slice(0, commaIdx).trim();
+            const after = val.slice(commaIdx + 1).trim();
+            if (before) storeCategoryChips.push(before);
+            e.target.value = after;
+            renderStoreCategoryChips();
+        }
+    });
+    
+    document.getElementById('store-categories-text').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = e.target.value.trim();
+            if (val) {
+                storeCategoryChips.push(val);
+                e.target.value = '';
+                renderStoreCategoryChips();
+            }
+        }
+    });
+    
+    document.getElementById('store-image').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('store-image-preview').src = e.target.result;
+                document.getElementById('store-image-preview').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+    
+    document.getElementById('store-logo').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('store-logo-preview').src = e.target.result;
+                document.getElementById('store-logo-preview').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+    
+    function openCreateModal() {
+        document.getElementById('modal-title').textContent = 'Add Store';
+        document.getElementById('store-form').reset();
+        document.getElementById('store-id').value = '';
+        document.getElementById('store-color').value = '';
+        storeCategoryChips = [];
+        document.getElementById('store-categories-text').value = '';
+        renderStoreCategoryChips();
+        document.getElementById('store-image').value = '';
+        document.getElementById('store-image-preview').style.display = 'none';
+        document.getElementById('store-logo').value = '';
+        document.getElementById('store-logo-preview').style.display = 'none';
+        document.getElementById('store-modal').style.display = 'block';
+    }
+    
+    function editStore(id) {
+        const store = stores.find(s => s.id === id);
+        document.getElementById('modal-title').textContent = 'Edit Store';
+        document.getElementById('store-id').value = store.id;
+        document.getElementById('store-name').value = store.name || '';
+        document.getElementById('store-budget').value = store.budget ?? '';
+        document.getElementById('store-color').value = store.color_code || '';
+        const catText = store.categories_text || formatCategoriesDisplay(store) || '';
+        storeCategoryChips = catText ? catText.split(',').map(s => s.trim()).filter(Boolean) : [];
+        document.getElementById('store-categories-text').value = '';
+        renderStoreCategoryChips();
+        document.getElementById('store-image').value = '';
+        
+        if (store.image) {
+            document.getElementById('store-image-preview').src = '/static/uploads/' + String(store.image).replace(UPLOADS_PREFIX, '');
+            document.getElementById('store-image-preview').style.display = 'block';
+        } else {
+            document.getElementById('store-image-preview').style.display = 'none';
+        }
+        document.getElementById('store-logo').value = '';
+        if (store.logo) {
+            document.getElementById('store-logo-preview').src = '/static/uploads/' + String(store.logo).replace(UPLOADS_PREFIX, '');
+            document.getElementById('store-logo-preview').style.display = 'block';
+        } else {
+            document.getElementById('store-logo-preview').style.display = 'none';
+        }
+        
+        document.getElementById('store-modal').style.display = 'block';
+    }
+    
+    function deleteStore(id) {
+        if (!confirm('Are you sure you want to delete this store?')) return;
+        fetch(`/stores/api/${id}`, { method: 'DELETE' })
+            .then(() => loadStores());
+    }
+    
+    function closeModal() {
+        document.getElementById('store-modal').style.display = 'none';
+    }
+    
+    function loadCategories() {
+        fetch('/categories/api?type=item')
+            .then(r => r.json())
+            .then(data => { allCategories = data || []; })
+            .catch(() => { allCategories = []; });
+    }
+    
+    function addCategory(name) {
+        if (selectedCategories.length >= 5) { alert('Maximum 5 categories allowed'); return; }
+        if (selectedCategories.includes(name)) return;
+        selectedCategories.push(name);
+        renderItemCategoryChips();
+        const inp = document.getElementById('category-input');
+        if (inp) inp.value = '';
+        const sug = document.getElementById('category-suggestions');
+        if (sug) sug.style.display = 'none';
+    }
+    
+    function removeCategory(name) {
+        selectedCategories = selectedCategories.filter(c => c !== name);
+        renderItemCategoryChips();
+    }
+    
+    function removeCategoryByIndex(idx) {
+        selectedCategories.splice(idx, 1);
+        renderItemCategoryChips();
+    }
+    
+    function renderItemCategoryChips() {
+        const container = document.getElementById('category-chips');
+        if (!container) return;
+        container.innerHTML = selectedCategories.map((cat, idx) => `
+            <div class="category-chip">
+                ${escapeHtml(cat)}
+                <span class="category-chip-remove" data-idx="${idx}" onclick="removeCategoryByIndex(parseInt(this.dataset.idx, 10))">×</span>
+            </div>
+        `).join('');
+    }
+    
+    function searchCategories(query) {
+        const sug = document.getElementById('category-suggestions');
+        if (!sug) return;
+        if (!query) { sug.style.display = 'none'; return; }
+        const attrEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        fetch(`/categories/api/search?q=${encodeURIComponent(query)}&type=item`)
+            .then(r => r.json())
+            .then(suggestions => {
+                const filtered = (suggestions || []).filter(s => !selectedCategories.includes(s.name));
+                if (filtered.length === 0 && !selectedCategories.includes(query)) {
+                    sug.innerHTML = `<div class="category-suggestion" data-add="${attrEsc(query)}">Create "${escapeHtml(query)}"</div>`;
+                } else {
+                    sug.innerHTML = filtered.map(s => `<div class="category-suggestion" data-add="${attrEsc(s.name)}">${escapeHtml(s.name)}</div>`).join('');
+                    if (!selectedCategories.includes(query)) {
+                        sug.innerHTML += `<div class="category-suggestion" data-add="${attrEsc(query)}">Create "${escapeHtml(query)}"</div>`;
+                    }
+                }
+                sug.querySelectorAll('.category-suggestion').forEach(el => {
+                    el.addEventListener('click', () => addCategory(el.dataset.add || ''));
+                });
+                sug.style.display = 'block';
+            })
+            .catch(() => { sug.style.display = 'none'; });
+    }
+    
+    function openCreateItemModal() {
+        document.getElementById('item-modal-title').textContent = 'Add Item';
+        document.getElementById('item-form').reset();
+        document.getElementById('item-id').value = '';
+        selectedCategories = [];
+        selectedStoreIds = [];
+        renderItemCategoryChips();
+        renderItemStoresCheckboxes();
+        document.getElementById('item-image-preview').style.display = 'none';
+        document.getElementById('item-modal').style.display = 'block';
+    }
+    
+    function editItem(id) {
+        const item = items.find(i => i.id === id);
+        if (!item) return;
+        document.getElementById('item-modal-title').textContent = 'Edit Item';
+        document.getElementById('item-id').value = item.id;
+        document.getElementById('item-name').value = item.name;
+        document.getElementById('item-quantity').value = item.quantity;
+        document.getElementById('item-unit').value = item.purchase_unit_type || '';
+        document.getElementById('item-full').value = item.full_amount;
+        document.getElementById('item-low').value = item.low_amount;
+        const pf = document.getElementById('item-purchase-freq');
+        if (pf) pf.value = item.purchase_frequency || '';
+        const lp = document.getElementById('item-last-purchase');
+        if (lp) lp.value = item.last_purchase_date || '';
+        const uf = document.getElementById('item-usage-freq');
+        if (uf) uf.value = item.usage_frequency || '';
+        selectedStoreIds = item.store_ids || (item.store_id != null ? [item.store_id] : []);
+        renderItemStoresCheckboxes();
+        selectedCategories = parseCategoryNamesForDisplay(item.category_names);
+        renderItemCategoryChips();
+        const prev = document.getElementById('item-image-preview');
+        if (item.image) {
+            prev.src = '/static/uploads/' + String(item.image).replace(UPLOADS_PREFIX, '');
+            prev.style.display = 'block';
+        } else {
+            prev.style.display = 'none';
+        }
+        document.getElementById('item-modal').style.display = 'block';
+    }
+    
+    function deleteItem(id) {
+        if (!confirm('Are you sure you want to delete this item?')) return;
+        fetch(`/items/api/${id}`, { method: 'DELETE' })
+            .then(() => loadItems());
+    }
+    
+    function closeItemModal() {
+        document.getElementById('item-modal').style.display = 'none';
+    }
+    
+    function loadShoppingLists() {
+        fetch('/shopping-lists/api')
+            .then(r => r.json())
+            .then(data => {
+                shoppingLists = data || [];
+                window.shoppingLists = shoppingLists;
+                renderLists();
+                renderStores();
+                loadCompletedShoppingLists();
+            })
+            .catch(() => {});
+    }
+    function loadCompletedShoppingLists() {
+        fetch('/shopping-lists/api/completed')
+            .then(r => r.json())
+            .then(data => {
+                completedListsGrouped = data || {};
+                renderCompletedShoppingLists();
+            })
+            .catch(() => {});
+    }
+    function getFilteredLists() {
+        const search = (document.getElementById('list-filter-search')?.value || '').trim().toLowerCase();
+        return shoppingLists.filter(l => {
+            const matchSearch = !search || (l.name || '').toLowerCase().includes(search);
+            return matchSearch;
+        });
+    }
+    function renderLists() {
+        const grid = document.getElementById('shopping-lists-grid');
+        if (!grid) return;
+        const toShow = getFilteredLists();
+        if (toShow.length === 0) {
+            grid.innerHTML = '<p class="empty-state">No shopping lists match. Add one or change the filter.</p>';
+            return;
+        }
+        const listOptions = (document.getElementById('list-store') || {}).options;
+        grid.innerHTML = toShow.map(list => {
+            const checkedCount = (list.items || []).filter(i => i.checked).length;
+            const totalCount = (list.items || []).length;
+            const budgetStatus = list.budget_status || 'spot_on';
+            const budgetStatusClass = budgetStatus === 'over' ? 'card-danger' : budgetStatus === 'under' ? 'card-success' : '';
+            const budgetDiff = list.budget > 0 ? (list.actual_spent - list.budget).toFixed(2) : 0;
+            const budgetStatusText = budgetStatus === 'over' ? 'Over Budget' : budgetStatus === 'under' ? 'Under Budget' : 'On Budget';
+            return `
+            <div class="glass-card card ${budgetStatusClass}">
+                <div class="card-header"><h3>${escapeHtml(list.name)}</h3></div>
+                <div class="card-body">
+                    ${list.store_name ? `<p><strong>Store:</strong> ${list.store_logo ? `<span class="store-chip"><img class="store-chip-logo" src="/static/uploads/${String(list.store_logo).replace(/^uploads\\/, '')}" alt="" onerror="this.style.display='none'"><span>${escapeHtml(list.store_name)}</span></span>` : escapeHtml(list.store_name)}</p>` : '<p><strong>Store:</strong> No store</p>'}
+                    <p><strong>Budget:</strong> $${(list.budget || 0).toFixed(2)} | <strong>Spent:</strong> $${(list.actual_spent || 0).toFixed(2)}</p>
+                    <p><strong>Items:</strong> ${checkedCount}/${totalCount} checked</p>
+                    <div style="max-height: 180px; overflow-y: auto;">
+                        ${(list.items || []).length ? (list.items || []).map(item => `
+                            <div class="shopping-list-item ${item.checked ? 'checked' : ''}" style="display: flex; align-items: center; gap: 8px; padding: 6px; margin-bottom: 4px; border-radius: 6px; background: rgba(255,255,255,0.05);">
+                                <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleListItem(${item.id}, this.checked)">
+                                <span>${escapeHtml(item.name)} ${item.quantity > 1 ? `(${item.quantity}${item.unit ? ' ' + item.unit : ''})` : ''}</span>
+                            </div>
+                        `).join('') : '<p style="color: var(--text-secondary); font-size: 14px;">No items</p>'}
+                    </div>
+                </div>
+                <div class="card-actions card-actions-bottom">
+                    <button type="button" class="btn-round-icon" onclick="completeList(${list.id})" title="Mark completed">✓</button>
+                    <button type="button" class="btn-round-icon" onclick="editList(${list.id})" title="Edit">✏️</button>
+                    <button type="button" class="btn-round-icon" onclick="deleteList(${list.id})" title="Delete">🗑️</button>
+                </div>
+            </div>
+            `;
+        }).join('');
+    }
+    function renderCompletedShoppingLists() {
+        const container = document.getElementById('completed-lists-container');
+        if (!container) return;
+        const search = (document.getElementById('list-filter-search')?.value || '').trim().toLowerCase();
+        const filterItem = (item) => {
+            const matchSearch = !search || (item.name || '').toLowerCase().includes(search);
+            return matchSearch;
+        };
+        const filtered = {};
+        Object.keys(completedListsGrouped || {}).forEach(dateStr => {
+            const arr = (completedListsGrouped[dateStr] || []).filter(filterItem);
+            if (arr.length) filtered[dateStr] = arr;
+        });
+        if (Object.keys(filtered).length === 0) {
+            container.innerHTML = '<p class="empty-state" style="color: var(--text-secondary);">No completed trips match.</p>';
+            return;
+        }
+        const sortedDates = Object.keys(filtered).sort((a,b) => new Date(b) - new Date(a));
+        container.innerHTML = sortedDates.map(dateStr => {
+            const date = new Date(dateStr);
+            const formatted = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            const items = filtered[dateStr];
+            return `<div style="margin-bottom: 24px;"><h4 style="margin-bottom: 12px; font-size: 18px; border-bottom: 1px solid var(--glass-border); padding-bottom: 8px;">${formatted}</h4><div style="display: flex; flex-wrap: wrap; gap: 12px;">${items.map(item => `
+                <div class="glass-card" style="padding: 12px 16px; min-width: 200px; opacity: 0.9;">
+                    <div style="font-weight: 600;">${escapeHtml(item.name)}</div>
+                    ${item.store_name ? `<div style="font-size: 12px; color: var(--text-secondary);">${escapeHtml(item.store_name)}</div>` : ''}
+                    ${item.budget > 0 ? `<div style="font-size: 12px;">Budget: $${item.budget.toFixed(2)} | Spent: $${item.actual_spent.toFixed(2)}</div>` : ''}
+                </div>
+            `).join('')}</div></div>`;
+        }).join('');
+    }
+    function toggleListItem(itemId, checked) {
+        fetch(`/shopping-lists/api/items/${itemId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ checked }) })
+            .then(() => loadShoppingLists()).catch(() => {});
+    }
+    function loadItemsForStore(storeId) {
+        if (!storeId) { storeItems = []; updateListItemDropdown(); return; }
+        fetch('/items/api?store_id=' + encodeURIComponent(storeId))
+            .then(r => r.json())
+            .then(data => { storeItems = data || []; updateListItemDropdown(); })
+            .catch(() => { storeItems = []; updateListItemDropdown(); });
+    }
+    function updateListItemDropdown() {
+        const sel = document.getElementById('list-item-dropdown');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">— Choose from store —</option>';
+        storeItems.forEach(item => {
+            const opt = document.createElement('option');
+            opt.value = item.id;
+            opt.textContent = item.name;
+            opt.dataset.name = item.name;
+            sel.appendChild(opt);
+        });
+    }
+    function addItemToList() {
+        const dropdown = document.getElementById('list-item-dropdown');
+        const nameInput = (document.getElementById('new-item-name') || {}).value.trim();
+        const quantity = parseFloat((document.getElementById('new-item-quantity') || {}).value) || 1;
+        const unit = (document.getElementById('new-item-unit') || {}).value.trim();
+        let name = nameInput;
+        let itemId = null;
+        if (dropdown && dropdown.value) {
+            itemId = parseInt(dropdown.value, 10);
+            name = dropdown.options[dropdown.selectedIndex].dataset.name || dropdown.options[dropdown.selectedIndex].textContent || name;
+        }
+        if (!name && !itemId) { alert('Choose an item or type a name.'); return; }
+        if (!name) name = 'Item';
+        listItems.push({ item_id: itemId, name, quantity, unit, checked: false });
+        renderListItems();
+        if (document.getElementById('new-item-name')) document.getElementById('new-item-name').value = '';
+        if (document.getElementById('new-item-quantity')) document.getElementById('new-item-quantity').value = '1';
+        if (document.getElementById('new-item-unit')) document.getElementById('new-item-unit').value = '';
+        if (dropdown) dropdown.value = '';
+    }
+    function removeItemFromList(index) {
+        listItems.splice(index, 1);
+        renderListItems();
+    }
+    function renderListItems() {
+        const container = document.getElementById('list-items-list');
+        if (!container) return;
+        container.innerHTML = listItems.map((item, index) => `
+            <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 6px;">
+                <span style="flex: 1;">${escapeHtml(item.name)}</span>
+                <span style="font-size: 12px; color: var(--text-secondary);">${item.quantity}${item.unit ? ' ' + item.unit : ''}</span>
+                <button type="button" class="btn-icon" onclick="removeItemFromList(${index})">🗑️</button>
+            </div>
+        `).join('');
+    }
+    function updateBudgetStatus() {
+        const budget = parseFloat((document.getElementById('list-budget') || {}).value) || 0;
+        const actual = parseFloat((document.getElementById('list-actual-spent') || {}).value) || 0;
+        const statusDiv = document.getElementById('budget-status');
+        const statusText = document.getElementById('budget-status-text');
+        if (!statusDiv || !statusText) return;
+        if (budget > 0) {
+            statusDiv.style.display = 'block';
+            const diff = actual - budget;
+            if (diff > 0) { statusDiv.style.background = 'rgba(239,68,68,0.2)'; statusText.textContent = 'Over by $' + diff.toFixed(2); statusText.style.color = '#ef4444'; }
+            else if (diff < 0) { statusDiv.style.background = 'rgba(34,197,94,0.2)'; statusText.textContent = 'Under by $' + Math.abs(diff).toFixed(2); statusText.style.color = '#22c55e'; }
+            else { statusDiv.style.background = 'rgba(59,130,246,0.2)'; statusText.textContent = 'On Budget'; statusText.style.color = '#3b82f6'; }
+        } else statusDiv.style.display = 'none';
+    }
+    function openListModal() {
+        document.getElementById('list-modal-title').textContent = 'Add Shopping List';
+        document.getElementById('shopping-list-form').reset();
+        document.getElementById('list-id').value = '';
+        listItems = []; storeItems = []; updateListItemDropdown(); renderListItems();
+        document.getElementById('list-budget').value = '0';
+        document.getElementById('list-actual-spent').value = '0';
+        document.getElementById('budget-status').style.display = 'none';
+        document.getElementById('shopping-list-modal').style.display = 'block';
+        document.body.classList.add('modal-open');
+    }
+    function editList(id) {
+        const list = shoppingLists.find(l => l.id === id);
+        if (!list) return;
+        document.getElementById('list-modal-title').textContent = 'Edit Shopping List';
+        document.getElementById('list-id').value = list.id;
+        document.getElementById('list-name').value = list.name;
+        document.getElementById('list-store').value = list.store_id || '';
+        document.getElementById('list-budget').value = list.budget || 0;
+        document.getElementById('list-actual-spent').value = list.actual_spent || 0;
+        listItems = (list.items || []).map(item => ({ item_id: item.item_id || null, name: item.name, quantity: item.quantity, unit: item.unit || '', checked: item.checked }));
+        renderListItems();
+        updateBudgetStatus();
+        loadItemsForStore(list.store_id || null);
+        document.getElementById('shopping-list-modal').style.display = 'block';
+        document.body.classList.add('modal-open');
+    }
+    function closeListModal() {
+        document.getElementById('shopping-list-modal').style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }
+    function completeList(id) {
+        if (!confirm('Mark this list as completed?')) return;
+        fetch(`/shopping-lists/api/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ completed: true }) })
+            .then(() => loadShoppingLists()).catch(() => {});
+    }
+    function deleteList(id) {
+        if (!confirm('Delete this shopping list?')) return;
+        fetch(`/shopping-lists/api/${id}`, { method: 'DELETE' }).then(() => loadShoppingLists()).catch(() => {});
+    }
+    function doSaveList(id, data, isEdit, items) {
+        const url = id ? `/shopping-lists/api/${id}` : '/shopping-lists/api';
+        const method = id ? 'PUT' : 'POST';
+        fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(listData => {
+                const listId = listData.id;
+                const replaceItems = () => {
+                    if (!items || items.length === 0) { closeListModal(); loadShoppingLists(); return Promise.resolve(); }
+                    return Promise.all(items.map(item =>
+                        fetch(`/shopping-lists/api/${listId}/items`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: item.item_id || null, name: item.name, quantity: item.quantity, unit: item.unit || null }), credentials: 'same-origin' })
+                    )).then(() => { closeListModal(); loadShoppingLists(); });
+                };
+                if (isEdit) return fetch(`/shopping-lists/api/${listId}/items`, { method: 'DELETE', credentials: 'same-origin' }).then(() => replaceItems());
+                return replaceItems();
+            })
+            .catch(() => alert('Failed to save list.'));
+    }
+    document.getElementById('list-store').addEventListener('change', function() { loadItemsForStore(this.value || null); });
+    document.getElementById('list-budget').addEventListener('input', updateBudgetStatus);
+    document.getElementById('list-actual-spent').addEventListener('input', updateBudgetStatus);
+    var listFilterSearch = document.getElementById('list-filter-search');
+    function applyFilters() {
+        renderLists();
+        renderCompletedShoppingLists();
+    }
+    if (listFilterSearch) listFilterSearch.addEventListener('input', applyFilters);
+    
+    var storeFilterSearch = document.getElementById('store-filter-search');
+    if (storeFilterSearch) storeFilterSearch.addEventListener('input', renderStores);
+    
+    var itemFilterSearch = document.getElementById('item-filter-search');
+    if (itemFilterSearch) itemFilterSearch.addEventListener('input', renderItems);
+    document.getElementById('shopping-list-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const id = document.getElementById('list-id').value;
+        const data = { name: document.getElementById('list-name').value, store_id: document.getElementById('list-store').value || null, budget: parseFloat(document.getElementById('list-budget').value) || 0, actual_spent: parseFloat(document.getElementById('list-actual-spent').value) || 0 };
+        const isEdit = !!id;
+        const items = listItems.map(i => ({ item_id: i.item_id || null, name: i.name, quantity: i.quantity, unit: i.unit || null }));
+        doSaveList(id, data, isEdit, items);
+    });
+    
+    function onAddItemToListSelect(selectEl) {
+        const listId = selectEl.value;
+        if (!listId) return;
+        const itemId = selectEl.dataset.itemId;
+        const itemName = selectEl.dataset.itemName || '';
+        const listName = (shoppingLists.find(l => String(l.id) === String(listId)) || {}).name || 'List';
+        fetch(`/shopping-lists/api/${listId}/items`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ item_id: itemId || null, name: itemName, quantity: 1, unit: null })
+        }).then(() => {
+            const msg = selectEl.closest('.store-item-actions').querySelector('.add-to-list-msg');
+            if (msg) { msg.textContent = 'Added to ' + listName; msg.style.display = 'inline'; msg.style.color = '#22c55e'; setTimeout(() => { msg.textContent = ''; msg.style.display = 'none'; }, 2500); }
+            selectEl.value = '';
+        }).catch(() => {});
+    }
+    let storeItemsModalStoreId = null;
+    let storeItemsModalStoreName = '';
+    function openStoreItemsModal(storeId, totalCount) {
+        storeItemsModalStoreId = storeId;
+        const storeObj = stores.find(s => s.id === storeId);
+        storeItemsModalStoreName = storeObj ? storeObj.name : 'Store';
+        const allItems = itemsForStore(storeId);
+        const listOptions = (window.shoppingLists || []).map(l => `<option value="${l.id}">${escapeHtml(l.name)}</option>`).join('');
+        document.getElementById('store-items-modal-title').textContent = storeItemsModalStoreName + ' – All items (' + totalCount + ')';
+        document.getElementById('store-items-modal-list').innerHTML = allItems.map(i => `
+            <li class="store-item-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--glass-border);">
+                <span>${escapeHtml(i.name)}${i.is_low ? ' <span style="color: var(--accent);">(low)</span>' : ''}</span>
+                <select class="form-input add-to-list-select" style="font-size: 12px; padding: 4px 8px; min-width: 120px;" data-item-id="${i.id}" data-item-name="${escapeHtml(i.name)}" onchange="onAddItemToListSelect(this)">
+                    <option value="">Add to list...</option>${listOptions}
+                </select>
+                <span class="add-to-list-msg" style="font-size: 11px; color: #22c55e; display: none;"></span>
+            </li>
+        `).join('');
+        document.getElementById('store-items-modal').style.display = 'block';
+        document.body.classList.add('modal-open');
+    }
+    function closeStoreItemsModal() {
+        document.getElementById('store-items-modal').style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }
+    
+    document.getElementById('store-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = document.getElementById('store-id').value;
+        const formData = new FormData();
+        formData.append('name', document.getElementById('store-name').value);
+        formData.append('budget', document.getElementById('store-budget').value || 0);
+        formData.append('color_code', document.getElementById('store-color').value || '');
+        const currentCategoryInput = document.getElementById('store-categories-text').value.trim();
+        const allCategories = currentCategoryInput ? [...storeCategoryChips, currentCategoryInput] : storeCategoryChips;
+        formData.append('categories_text', allCategories.join(', '));
+        formData.append('categories', '[]');
+        
+        const imageFile = document.getElementById('store-image').files[0];
+        if (imageFile) {
+            formData.append('image', imageFile);
+        }
+        const logoFile = document.getElementById('store-logo').files[0];
+        if (logoFile) {
+            formData.append('logo', logoFile);
+        }
+        
+        const url = id ? `/stores/api/${id}` : '/stores/api';
+        const method = id ? 'PUT' : 'POST';
+        
+        fetch(url, {
+            method,
+            body: formData
+        }).then(r => {
+            if (!r.ok) return r.text().then(t => Promise.reject(new Error(t || r.statusText)));
+            closeModal();
+            loadStores();
+        }).catch(err => {
+            console.error('Store save failed:', err);
+            alert('Failed to save store. Check console. If the server reported missing columns, run: python3 migrate_database.py');
+        });
+    });
+    
+    const categoryInput = document.getElementById('category-input');
+    if (categoryInput) {
+        categoryInput.addEventListener('input', (e) => {
+            clearTimeout(categoryInputTimeout);
+            categoryInputTimeout = setTimeout(() => searchCategories(e.target.value), 300);
+        });
+        categoryInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const val = e.target.value.trim();
+                if (val) addCategory(val);
+            }
+        });
+    }
+    const itemImageInput = document.getElementById('item-image');
+    if (itemImageInput) {
+        itemImageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const prev = document.getElementById('item-image-preview');
+                    prev.src = ev.target.result;
+                    prev.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#category-picker-container')) {
+            const sug = document.getElementById('category-suggestions');
+            if (sug) sug.style.display = 'none';
+        }
+    });
+    
+    document.getElementById('item-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = document.getElementById('item-id').value;
+        const formData = new FormData();
+        formData.append('name', document.getElementById('item-name').value);
+        formData.append('quantity', document.getElementById('item-quantity').value || 0);
+        formData.append('purchase_unit_type', document.getElementById('item-unit').value);
+        formData.append('full_amount', document.getElementById('item-full').value || 0);
+        formData.append('low_amount', document.getElementById('item-low').value || 0);
+        const pf = document.getElementById('item-purchase-freq');
+        if (pf) formData.append('purchase_frequency', pf.value);
+        const lp = document.getElementById('item-last-purchase');
+        if (lp) formData.append('last_purchase_date', lp.value || '');
+        const uf = document.getElementById('item-usage-freq');
+        if (uf) formData.append('usage_frequency', uf.value || '');
+        formData.append('store_ids', JSON.stringify(selectedStoreIds));
+        if (selectedStoreIds.length) formData.append('store_id', String(selectedStoreIds[0]));
+        formData.append('categories', JSON.stringify(selectedCategories));
+        const imageFile = document.getElementById('item-image').files[0];
+        if (imageFile) formData.append('image', imageFile);
+        const url = id ? `/items/api/${id}` : '/items/api';
+        const method = id ? 'PUT' : 'POST';
+        fetch(url, { method, body: formData })
+            .then(r => { if (!r.ok) throw new Error(); closeItemModal(); loadItems(); })
+            .catch(() => alert('Failed to save item.'));
+    });
+    
+    loadStores();
+    loadCategories();
+    
+    if (window.location.hash === '#items-section') {
+        document.getElementById('items-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    if (window.location.hash === '#lists-section') {
+        document.getElementById('lists-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    window.openCreateModal = openCreateModal;
+    window.editStore = editStore;
+    window.deleteStore = deleteStore;
+    window.closeModal = closeModal;
+    window.openCreateItemModal = openCreateItemModal;
+    window.editItem = editItem;
+    window.deleteItem = deleteItem;
+    window.closeItemModal = closeItemModal;
+</script>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications - The Chores{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h2 class="page-title">Notifications</h2>
+    </div>
+    <div id="notifications-list" class="glass-card" style="padding: 24px;">
+        <p class="empty-state" style="color: var(--text-secondary);">No notifications yet.</p>
+    </div>
+</div>
+<script>
+    function markRead(id, el) {
+        fetch('/notifications/api/' + id + '/read', { method: 'POST' })
+            .then(function() {
+                if (el) el.closest('li').classList.remove('unread');
+            });
+    }
+    fetch('/notifications/api')
+        .then(r => r.json())
+        .then(function(data) {
+            const container = document.getElementById('notifications-list');
+            if (!data.items || data.items.length === 0) {
+                container.innerHTML = '<p class="empty-state" style="color: var(--text-secondary);">No notifications yet.</p>';
+                return;
+            }
+            container.innerHTML = '<ul style="list-style: none; padding: 0; margin: 0;">' +
+                data.items.map(function(n) {
+                    var msg = n.message || '';
+                    var dateStr = n.created_at ? new Date(n.created_at).toLocaleString() : '';
+                    var href = n.link || '#';
+                    var unreadClass = n.read ? '' : ' unread';
+                    var markBtn = n.read ? '' : (' <button type="button" class="btn btn-secondary notification-mark-read" style="margin-left: 8px; padding: 4px 10px; font-size: 12px;" data-id="' + n.id + '" onclick="event.preventDefault(); event.stopPropagation(); markRead(' + n.id + ', this)">Mark read</button>');
+                    return '<li class="notification-item' + unreadClass + '" style="padding: 12px; border-bottom: 1px solid var(--glass-border); color: var(--text-primary); cursor: ' + (n.link ? 'pointer' : 'default') + ';" data-href="' + (n.link || '') + '" onclick="if(this.dataset.href) window.location.href=this.dataset.href">' +
+                        '<span>' + msg + '</span>' + markBtn +
+                        (dateStr ? '<div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">' + dateStr + '</div>' : '') +
+                        '</li>';
+                }).join('') +
+                '</ul>';
+        })
+        .catch(function() {
+            document.getElementById('notifications-list').innerHTML = '<p class="empty-state" style="color: var(--text-secondary);">Could not load notifications.</p>';
+        });
+</script>
+<style>
+    .notification-item.unread { background: rgba(255, 193, 7, 0.15); border-left: 4px solid #ffc107; }
+</style>
+{% endblock %}

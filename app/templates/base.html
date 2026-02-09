@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}The Chores{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_head %}{% endblock %}
+    {% if current_user.is_authenticated and current_user.background_image %}
+    <style>
+        body {
+            background-image: url('/static/uploads/{{ current_user.background_image }}?t={{ current_user.id }}');
+            {% if current_user.background_position == 'tiled' %}
+            background-repeat: repeat;
+            {% elif current_user.background_position == 'stretched' %}
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            {% elif current_user.background_position == 'fit' %}
+            background-size: contain;
+            background-repeat: no-repeat;
+            {% else %}
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            {% endif %}
+            background-attachment: fixed;
+        }
+        {% if current_user.background_gradient %}
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient({{ current_user.background_gradient }});
+            opacity: 0.8;
+            z-index: -1;
+        }
+        {% else %}
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-primary);
+            opacity: 0.95;
+            z-index: -2;
+        }
+        {% endif %}
+        /* Ensure text remains visible with background images */
+        body {
+            color: var(--text-primary) !important;
+        }
+        .glass-card {
+            color: var(--text-primary) !important;
+        }
+        .glass-card h1, .glass-card h2, .glass-card h3, .glass-card p, .glass-card span {
+            color: white;
+        }
+    </style>
+    {% elif current_user.is_authenticated and current_user.background_gradient %}
+    <style>
+        body {
+            background: linear-gradient({{ current_user.background_gradient }}) !important;
+            background-attachment: fixed;
+        }
+    </style>
+    {% endif %}
+    {% if current_user.is_authenticated %}
+    <style>
+        :root {
+            {% if current_user.background_gradient %}
+            --user-gradient: linear-gradient({{ current_user.background_gradient }});
+            {% else %}
+            --user-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            {% endif %}
+        }
+    </style>
+    {% endif %}
+    {% if current_user.is_authenticated and current_user.color_scheme %}
+    <script>
+        // Apply color scheme immediately on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            document.body.className = document.body.className.replace(/color-scheme-\w+/g, '');
+            document.body.classList.add('color-scheme-{{ current_user.color_scheme }}');
+        });
+    </script>
+    {% endif %}
+    {% if current_user.is_authenticated %}
+    <style>
+        /* Modal: use user's color with Apple Blur for better readability */
+        .modal .modal-content,
+        .modal .modal-content.glass-card {
+            color: var(--text-primary) !important;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .modal .modal-content *,
+        .modal .modal-content.glass-card * {
+            color: inherit;
+        }
+        .modal .modal-content h1,
+        .modal .modal-content h2,
+        .modal .modal-content h3,
+        .modal .modal-content h4,
+        .modal .modal-content p,
+        .modal .modal-content span,
+        .modal .modal-content label,
+        .modal .modal-content td,
+        .modal .modal-content th,
+        .modal .modal-content li {
+            color: var(--text-primary) !important;
+        }
+        .modal .modal-content small,
+        .modal .modal-content .text-secondary {
+            color: var(--text-secondary) !important;
+        }
+        .modal .modal-content input,
+        .modal .modal-content select,
+        .modal .modal-content textarea,
+        .modal .modal-content .form-input {
+            color: var(--text-primary) !important;
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--glass-border);
+        }
+        {% if current_user.background_gradient %}
+        .modal .modal-content.glass-card,
+        .modal .modal-content {
+            background: linear-gradient({{ current_user.background_gradient }}) !important;
+        }
+        {% endif %}
+    </style>
+    {% endif %}
+    {% if current_user.is_authenticated %}
+    <style>
+        /* Profile dropdown: only show when icon clicked (respect [hidden]) */
+        #user-menu-dropdown[hidden] {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        /* Profile dropdown: vertical, blurred bg, black text */
+        #user-menu-dropdown {
+            background: rgba(255, 255, 255, 0.85) !important;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid #e5e7eb !important;
+            border-radius: 12px !important;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15) !important;
+            display: block !important;
+            flex-direction: column !important;
+        }
+        #user-menu-dropdown a {
+            display: block !important;
+            color: #111827 !important;
+            padding: 12px 20px !important;
+            border-bottom: 1px solid #e5e7eb !important;
+        }
+        #user-menu-dropdown a:last-child { border-bottom: none !important; }
+        #user-menu-dropdown a:hover { background: #f3f4f6 !important; }
+    </style>
+    {% endif %}
+</head>
+<body class="{% if current_user.is_authenticated %}logged-in {% endif %}{% if current_user.is_authenticated and current_user.color_scheme %}color-scheme-{{ current_user.color_scheme }}{% endif %}">
+    {% if current_user.is_authenticated %}
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <!-- Logo/Brand -->
+            <a href="{{ url_for('dashboard') }}" class="nav-logo">The Chores</a>
+            
+            <!-- Menu button (mobile only) -->
+            <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open menu">
+                <span class="nav-toggle-icon">☰</span>
+            </button>
+            
+            <!-- Pill-shaped navigation group -->
+            <div class="nav-pill-group">
+                <a href="{{ url_for('dashboard') }}" class="nav-link" data-route="dashboard">Dashboard</a>
+                {% if current_user.is_admin %}
+                <a href="{{ url_for('chores.list_chores') }}" class="nav-link" data-route="chores">Chores</a>
+                {% endif %}
+                <a href="{{ url_for('stores.list_stores') }}" class="nav-link" data-route="stores">Shopping</a>
+                <a href="{{ url_for('rooms.list_rooms') }}" class="nav-link" data-route="rooms">Rooms</a>
+                <a href="{{ url_for('projects.list_projects') }}" class="nav-link" data-route="projects">Projects</a>
+                <a href="{{ url_for('events.list_events') }}" class="nav-link" data-route="events">Events</a>
+                <a href="{{ url_for('store.store_page') }}" class="nav-link" data-route="store">Store</a>
+                {% if current_user.is_admin %}
+                <a href="{{ url_for('users.list_users') }}" class="nav-link" data-route="users">Users</a>
+                {% endif %}
+            </div>
+            
+            <!-- Profile button -->
+            <div class="user-menu-wrap" id="user-menu-wrap">
+                <button type="button" class="top-bar-profile user-menu-trigger" id="user-menu-trigger" aria-label="User menu" aria-expanded="false" aria-haspopup="true">
+                    <span class="user-menu-badge" id="user-menu-badge" style="display: none;">0</span>
+                    {% if current_user.profile_image %}
+                    <img src="/static/uploads/{{ current_user.profile_image }}?t={{ current_user.id }}" alt="{{ current_user.name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    {% else %}
+                    <div class="top-bar-avatar">👤</div>
+                    {% endif %}
+                </button>
+                <div class="user-menu-dropdown" id="user-menu-dropdown" role="menu" hidden>
+                    <a href="{{ url_for('settings.settings') }}" role="menuitem">Settings</a>
+                    <a href="{{ url_for('notifications.list_notifications') }}" role="menuitem">Notifications <span class="user-menu-dropdown-badge" id="dropdown-notif-count"></span></a>
+                    <a href="{{ url_for('settings.settings') }}" role="menuitem">Profile</a>
+                    <a href="{{ url_for('auth.logout') }}" role="menuitem">Logout</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="bank-float" id="bank-float" title="Your token balance">
+        <span class="bank-float-label">Tokens</span>
+        <span class="bank-float-amount">{{ "%.0f"|format(current_user.bank or 0) }}</span>
+    </div>
+    {% endif %}
+    
+    <main class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </main>
+    
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+    (function() {
+        function updateModalOpen() {
+            var open = document.querySelector('.modal[style*="display: block"]');
+            document.body.classList.toggle('modal-open', !!open);
+        }
+        var obs = new MutationObserver(updateModalOpen);
+        document.querySelectorAll('.modal').forEach(function(el) {
+            obs.observe(el, { attributes: true, attributeFilter: ['style'] });
+        });
+    })();
+    </script>
+    {% if current_user.is_authenticated %}
+    <script>
+    (function() {
+        var toggle = document.getElementById('nav-toggle');
+        var nav = document.getElementById('navbar');
+        if (toggle && nav) {
+            toggle.addEventListener('click', function(e) {
+                e.stopPropagation();
+                nav.classList.toggle('navbar-open');
+                toggle.setAttribute('aria-label', nav.classList.contains('navbar-open') ? 'Close menu' : 'Open menu');
+                toggle.querySelector('.nav-toggle-icon').textContent = nav.classList.contains('navbar-open') ? '✕' : '☰';
+            });
+            // Close menu when clicking outside or on a nav link
+            document.addEventListener('click', function(e) {
+                if (nav.classList.contains('navbar-open')) {
+                    var isNavLink = e.target.closest('.nav-link');
+                    var isToggle = e.target.closest('#nav-toggle');
+                    if (!nav.contains(e.target) || (isNavLink && !isToggle)) {
+                        nav.classList.remove('navbar-open');
+                        toggle.setAttribute('aria-label', 'Open menu');
+                        toggle.querySelector('.nav-toggle-icon').textContent = '☰';
+                    }
+                }
+            });
+        }
+        var userWrap = document.getElementById('user-menu-wrap');
+        var userTrigger = document.getElementById('user-menu-trigger');
+        var userDropdown = document.getElementById('user-menu-dropdown');
+        var badge = document.getElementById('user-menu-badge');
+        var dropdownNotif = document.getElementById('dropdown-notif-count');
+        if (userWrap && userTrigger && userDropdown) {
+            userTrigger.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var open = userDropdown.hidden === false;
+                userDropdown.hidden = open;
+                userTrigger.setAttribute('aria-expanded', !open);
+            });
+            document.addEventListener('click', function() {
+                userDropdown.hidden = true;
+                userTrigger.setAttribute('aria-expanded', 'false');
+            });
+        }
+        if (badge || dropdownNotif) {
+            fetch('/notifications/api').then(function(r) { return r.json(); }).then(function(data) {
+                var count = (data && data.count) || 0;
+                if (badge) {
+                    badge.textContent = count > 99 ? '99+' : count;
+                    badge.style.display = count > 0 ? 'flex' : 'none';
+                }
+                if (dropdownNotif) {
+                    dropdownNotif.textContent = count > 0 ? '(' + count + ')' : '';
+                }
+            }).catch(function() {});
+        }
+        
+        // Highlight active nav link based on current URL
+        (function() {
+            var currentPath = window.location.pathname;
+            var navLinks = document.querySelectorAll('.nav-link[data-route]');
+            
+            navLinks.forEach(function(link) {
+                var route = link.getAttribute('data-route');
+                var href = link.getAttribute('href');
+                
+                // Check if current path matches this link
+                if (currentPath === href || 
+                    (route === 'dashboard' && (currentPath === '/' || currentPath === '/dashboard')) ||
+                    (route === 'chores' && currentPath.startsWith('/chores')) ||
+                    (route === 'stores' && currentPath.startsWith('/stores')) ||
+                    (route === 'rooms' && currentPath.startsWith('/rooms')) ||
+                    (route === 'projects' && currentPath.startsWith('/projects')) ||
+                    (route === 'events' && currentPath.startsWith('/events')) ||
+                    (route === 'store' && currentPath.startsWith('/store')) ||
+                    (route === 'users' && currentPath.startsWith('/users'))) {
+                    link.classList.add('nav-link-active');
+                }
+            });
+        })();
+    })();
+    </script>
+    {% endif %}
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

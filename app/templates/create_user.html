@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Create User - The Chores{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="glass-card" style="max-width: 600px; margin: 0 auto;">
+        <h2 class="page-title">Create New User</h2>
+        <form method="POST" action="{{ url_for('users.create_user') }}">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="is_admin" name="is_admin"> Admin User
+                </label>
+            </div>
+            <h3 style="margin-top: 24px; margin-bottom: 16px;">Security Questions</h3>
+            <div class="form-group">
+                <label for="security_question_1">Question 1</label>
+                <input type="text" id="security_question_1" name="security_question_1" required class="form-input">
+                <label for="security_answer_1" style="margin-top: 8px;">Answer 1</label>
+                <input type="text" id="security_answer_1" name="security_answer_1" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="security_question_2">Question 2</label>
+                <input type="text" id="security_question_2" name="security_question_2" required class="form-input">
+                <label for="security_answer_2" style="margin-top: 8px;">Answer 2</label>
+                <input type="text" id="security_answer_2" name="security_answer_2" required class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="security_question_3">Question 3</label>
+                <input type="text" id="security_question_3" name="security_question_3" required class="form-input">
+                <label for="security_answer_3" style="margin-top: 8px;">Answer 3</label>
+                <input type="text" id="security_answer_3" name="security_answer_3" required class="form-input">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Create User</button>
+                <a href="{{ url_for('users.list_users') }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

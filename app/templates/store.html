@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Chore Store - The Chores{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h2 class="page-title">Chore Store</h2>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <span style="color: var(--text-secondary); font-size: 14px;">Your balance: <strong id="store-balance" style="color: #ffd700;">{{ "%.0f"|format(current_user.bank) }}</strong> tokens</span>
+            <a href="{{ url_for('store.cash_out_page') }}" class="btn btn-primary">Cash out</a>
+            {% if current_user.is_admin %}
+            <a href="{{ url_for('store.token_settings_page') }}" class="btn btn-secondary">Token settings</a>
+            <a href="{{ url_for('store.admin_items_page') }}" class="btn btn-secondary">Manage items</a>
+            {% endif %}
+        </div>
+    </div>
+    
+    <p style="color: var(--text-secondary); margin-bottom: 24px;">Spend your tokens on rewards. Complete chores to earn more tokens.</p>
+    
+    <div class="cards-grid" id="store-items-grid">
+        <p style="color: var(--text-secondary);">Loading...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function loadItems() {
+        fetch('/store/api/items')
+            .then(r => r.json())
+            .then(items => {
+                const grid = document.getElementById('store-items-grid');
+                if (!items.length) {
+                    grid.innerHTML = '<p class="empty-state">No items in the store yet.</p>';
+                    return;
+                }
+                grid.innerHTML = items.map(item => `
+                    <div class="glass-card card" style="display: flex; flex-direction: column;">
+                        <div class="card-header">
+                            <h3>${escapeHtml(item.title)}</h3>
+                            <span style="font-size: 18px; font-weight: 700; color: #ffd700;">${item.cost_tokens} tokens</span>
+                        </div>
+                        <div class="card-body" style="flex: 1;">
+                            ${item.description ? `<p style="margin-bottom: 12px;">${escapeHtml(item.description)}</p>` : ''}
+                            ${item.rules ? `<div style="font-size: 13px; color: var(--text-secondary); margin-top: 8px;"><strong>Rules:</strong><pre style="white-space: pre-wrap; margin: 4px 0 0 0;">${escapeHtml(item.rules)}</pre></div>` : ''}
+                        </div>
+                        <div style="padding: 12px 16px; border-top: 1px solid var(--glass-border);">
+                            <button type="button" class="btn btn-primary purchase-btn" data-id="${item.id}" data-cost="${item.cost_tokens}" data-title="${escapeHtml(item.title).replace(/"/g, '&quot;')}">Purchase</button>
+                        </div>
+                    </div>
+                `).join('');
+            })
+            .catch(() => {
+                document.getElementById('store-items-grid').innerHTML = '<p class="empty-state">Failed to load items.</p>';
+            });
+    }
+    function escapeHtml(s) {
+        const div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
+    document.getElementById('store-items-grid').addEventListener('click', function(e) {
+        const btn = e.target.closest('.purchase-btn');
+        if (!btn) return;
+        const itemId = parseInt(btn.dataset.id, 10);
+        const cost = parseFloat(btn.dataset.cost);
+        const title = btn.dataset.title || 'Item';
+        if (!confirm('Purchase "' + title + '" for ' + cost + ' tokens?')) return;
+        fetch('/store/api/purchase', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ store_item_id: itemId })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            document.getElementById('store-balance').textContent = Math.round(data.balance);
+            if (document.querySelector('.bank-float-amount'))
+                document.querySelector('.bank-float-amount').textContent = Math.round(data.balance);
+            alert(data.message || 'Purchased!');
+        })
+        .catch(() => alert('Purchase failed.'));
+    });
+    loadItems();
+</script>
+{% endblock extra_scripts %}
